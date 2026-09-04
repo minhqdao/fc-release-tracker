@@ -17,9 +17,7 @@ channels:
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
 
 The checks run on a schedule via a GitHub Actions workflow
-[`.github/workflows/check.yml`](.github/workflows/check.yml). The last-seen version of each compiler
-is stored in [`data/state.json`](data/state.json). When a check detects a
-version newer than the stored one, a new issue is created.
+[`.github/workflows/check.yml`](.github/workflows/check.yml). The last-seen version of each compiler is stored in [`data/state.json`](data/state.json). Each compiler source gets two tracking issues: one for new releases (implement downstream, then close) and one for check failures (fix, then close); repeats arrive as comments.
 
 ## Usage
 

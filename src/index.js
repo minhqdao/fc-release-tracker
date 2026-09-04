@@ -1,7 +1,8 @@
 /**
  * Entry point: runs all compiler checks, diffs against the last-seen
- * versions in data/state.json, opens/comments on a GitHub tracking issue
- * for any new releases, then persists the updated state.
+ * versions in data/state.json, notifies per-source GitHub tracking issues
+ * (releases and failures get separate threads), then persists the state of
+ * successfully delivered detections.
  */
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -10,7 +11,7 @@ import path from "node:path";
 
 import { runAllChecks } from "./lib/checks.js";
 import { isNewer } from "./lib/version.js";
-import { notifyNewReleases } from "./lib/github.js";
+import { notifyCompilerEvents } from "./lib/github.js";
 
 const STATE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -55,23 +56,38 @@ export async function main() {
 
   const newReleases = checks
     .filter((r) => isNewer(r.latestVersion, state[r.compiler]))
-    .map((r) => ({ ...r, previousVersion: state[r.compiler] }));
+    .map((r) => ({
+      kind: "release",
+      compiler: r.compiler,
+      previousVersion: state[r.compiler],
+      latestVersion: r.latestVersion,
+      url: r.url,
+    }));
 
-  if (newReleases.length > 0) {
-    // Only persist state if the notification succeeded, so a failed issue
-    // post is retried on the next run instead of silently swallowed.
-    await notifyNewReleases(newReleases);
-  }
+  // Every failed check becomes an event on its own compiler's issue, too —
+  // breakage is reported per source, not just as a red workflow run.
+  const events = [
+    ...newReleases,
+    ...failures.map((f) => ({ kind: "error", compiler: f.name, error: f.reason })),
+  ];
 
+  const { delivered, problems } = await notifyCompilerEvents(events);
+
+  // Persist a detected release only once its notification landed, so a
+  // failed post is retried on the next run instead of silently swallowed.
+  const newReleaseKeys = new Set(newReleases.map((r) => r.compiler));
   const nextState = { ...state };
-  for (const r of checks) nextState[r.compiler] = r.latestVersion;
+  for (const r of checks) {
+    if (!newReleaseKeys.has(r.compiler) || delivered.has(r.compiler)) {
+      nextState[r.compiler] = r.latestVersion;
+    }
+  }
   await saveState(nextState);
 
-  if (failures.length > 0) {
-    for (const f of failures) console.error(`${f.name} check failed:`, f.reason);
-    // Non-zero exit marks the workflow run red so parser breakage is visible.
-    process.exitCode = 1;
-  }
+  for (const f of failures) console.error(`${f.name} check failed:`, f.reason);
+  // Non-zero exit marks the workflow run red so parser breakage is visible
+  // (and notification failures too, even though they already got an issue).
+  if (failures.length > 0 || problems.length > 0) process.exitCode = 1;
 }
 
 main();

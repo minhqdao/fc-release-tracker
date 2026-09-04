@@ -1,11 +1,11 @@
 {
-  "aocc": null,
-  "armflang": null,
-  "flang": null,
-  "gfortran-apt": null,
-  "gfortran-brew": null,
-  "gfortran-winlibs": null,
-  "ifx": null,
-  "lfortran": null,
-  "nvfortran": null
+  "aocc": "5.2",
+  "armflang": "22.1",
+  "flang": "23.1.0",
+  "gfortran-apt": "16",
+  "gfortran-brew": "16.2.0",
+  "gfortran-winlibs": "16.2.0",
+  "ifx": "2026.1.1",
+  "lfortran": "0.65.0",
+  "nvfortran": "26.5"
 }
