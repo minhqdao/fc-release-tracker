@@ -19,7 +19,7 @@ npm run latest
 List latest version of a specific compiler:
 
 ```sh
-npm run latest -- ifx
+npm run latest -- lfortran
 ```
 
 Check for new releases and update local state:
