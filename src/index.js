@@ -23,6 +23,7 @@ const DEFAULT_STATE = {
   aocc: null,
   armflang: null,
   ifx: null,
+  lfortran: null,
   nvfortran: null,
 };
 

@@ -9,6 +9,7 @@ channels:
 | aocc | https://developer.amd.com/amd-aocc/ |
 | armflang | https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages |
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
+| lfortran | https://api.anaconda.org/package/conda-forge/lfortran |
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
 
 The checks run on a schedule via a GitHub Actions workflow

@@ -1,0 +1,39 @@
+/**
+ * LFortran release checker.
+ *
+ * Source of truth: the conda-forge `lfortran` package via Anaconda.org's
+ * public API — the same (and per setup-fortran's comments, the only
+ * current) binary distribution channel used on Linux, macOS, and Windows:
+ * https://api.anaconda.org/package/conda-forge/lfortran
+ * Versions are plain `0.x.y` dotted numbers shared across all platforms.
+ */
+
+import { fetchText, maxVersion } from "./lib/http.js";
+
+export const LFORTRAN_CONDA_URL =
+  "https://api.anaconda.org/package/conda-forge/lfortran";
+
+/**
+ * @returns {Promise<{ compiler: "lfortran", latestVersion: string, url: string }>}
+ */
+export async function checkLFortran() {
+  const data = JSON.parse(await fetchText(LFORTRAN_CONDA_URL));
+  const candidates = (data.versions ?? []).filter((v) =>
+    /^\d+\.\d+(\.\d+)?$/.test(v),
+  );
+  if (candidates.length === 0) {
+    throw new Error(`no lfortran versions found at ${LFORTRAN_CONDA_URL}`);
+  }
+  const latestVersion = maxVersion(candidates);
+  return { compiler: "lfortran", latestVersion, url: LFORTRAN_CONDA_URL };
+}
+
+// Allow running standalone: node src/check-lfortran.js
+if (import.meta.url === `file://${process.argv[1]}`) {
+  checkLFortran()
+    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    });
+}

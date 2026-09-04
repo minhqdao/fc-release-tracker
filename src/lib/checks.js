@@ -6,6 +6,7 @@
 import { checkAOCC } from "../check-aocc.js";
 import { checkArmflang } from "../check-armflang.js";
 import { checkIfx } from "../check-ifx.js";
+import { checkLFortran } from "../check-lfortran.js";
 import { checkNvfortran } from "../check-nvfortran.js";
 
 /** @type {Readonly<Record<string, () => Promise<{ compiler: string, latestVersion: string, url: string }>>>} */
@@ -13,6 +14,7 @@ export const CHECKS = Object.freeze({
   aocc: checkAOCC,
   armflang: checkArmflang,
   ifx: checkIfx,
+  lfortran: checkLFortran,
   nvfortran: checkNvfortran,
 });
 
