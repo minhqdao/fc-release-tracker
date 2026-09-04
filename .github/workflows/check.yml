@@ -25,6 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Commit updated state
+        if: ${{ !cancelled() }}
         run: |
           if git diff --quiet -- data/state.json; then
             echo "No state changes to commit"
