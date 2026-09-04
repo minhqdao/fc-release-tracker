@@ -5,7 +5,8 @@
  * per-source threads capped at MAX_FAILURE_ISSUES open issues to keep
  * breakage storms bounded. Both kinds receive repeated events as comments.
  *
- * Identified by exact title (no labels — this repo's issue list is ours).
+ * Identified by exact title ("New Release: <source>" / "Error during
+ * check: <source>"; no labels — this repo's issue list is ours).
  * Uses the REST API directly (no deps).
  *
  * Required env when running in GitHub Actions (set by the workflow):
@@ -19,7 +20,8 @@ const API_ROOT = "https://api.github.com";
 
 /** Upper bound on simultaneously open per-source check-failure issues. */
 export const MAX_FAILURE_ISSUES = 5;
-const FAILURE_SUFFIX = " — check failures";
+const RELEASE_PREFIX = "New Release: ";
+const FAILURE_PREFIX = "Error during check: ";
 
 const JSON_HEADERS = {
   Accept: "application/vnd.github+json",
@@ -27,7 +29,9 @@ const JSON_HEADERS = {
 };
 
 export const issueTitle = (kind, compiler) =>
-  kind === "release" ? `${compiler} — new releases` : `${compiler}${FAILURE_SUFFIX}`;
+  kind === "release"
+    ? `${RELEASE_PREFIX}${compiler}`
+    : `${FAILURE_PREFIX}${compiler}`;
 
 const ISSUE_INTRO = {
   release:
@@ -129,7 +133,7 @@ export async function notifyCompilerEvents(events) {
 
   const openIssues = await fetchOpenIssues(repo, token);
   let failureThreads = [...openIssues.keys()].filter((title) =>
-    title.endsWith(FAILURE_SUFFIX),
+    title.startsWith(FAILURE_PREFIX),
   ).length;
   for (const event of events) {
     const title = issueTitle(event.kind, event.compiler);
