@@ -5,18 +5,19 @@
  * PPA (noble) — the very file apt itself consumes when setup-fortran adds
  * the PPA for versions Ubuntu's own archive lacks.
  *
- * This channel reports the NEWEST INSTALLABLE MAJOR (e.g. "16"), not a
- * full version string: apt snapshot builds predate any official release,
- * so their Version field looks like "16-20260315-1ubuntu1~24~ppa1"
- * (date-based, churns on every rebuild), and the action's apt path keys
- * off majors only (`gfortran-<N>` + needsPpa routing). A new package
- * stanza is exactly the actionable event; patch bumps need no edits and
- * their version strings would only generate noise.
+ * Tracks the NEWEST MAJOR in the archive. While that major only exists as
+ * snapshot builds — whose date-based versions ("16-20260315-1ubuntu1~24~ppa1")
+ * churn on every rebuild and carry no minor/patch — we report the bare
+ * major ("16"); as soon as a release-format "16.x.y" version appears, it is
+ * reported and compared in full like every other channel. Transitions
+ * ("16" → "16.1.0" → "16.1.1" → "17") each notify exactly once through
+ * lib/version.js ordering. Older majors still present in the archive (e.g.
+ * a stable 15.2.0 next to a snapshot 16) are deliberately not reported.
  */
 
 import { gunzipSync } from "node:zlib";
 
-import { fetchBytes } from "./lib/http.js";
+import { fetchBytes, maxVersion } from "./lib/http.js";
 
 export const GFORTRAN_APT_INDEX_URL =
   "https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/main/binary-amd64/Packages.gz";
@@ -27,13 +28,29 @@ export const GFORTRAN_APT_INDEX_URL =
 export async function checkGFortranApt() {
   const raw = await fetchBytes(GFORTRAN_APT_INDEX_URL);
   const text = gunzipSync(new Uint8Array(raw)).toString("utf8");
-  const majors = new Set(
-    [...text.matchAll(/^Package: gfortran-(\d+)$/gm)].map((m) => Number(m[1])),
-  );
-  if (majors.size === 0) {
+  let maxMajor = 0;
+  /** @type {string[]} */
+  const releaseVersionsOfMax = [];
+  for (const stanza of text.split(/\n\s*\n/)) {
+    const match = /^Package: gfortran-(\d+)$/m.exec(stanza);
+    if (!match) continue;
+    const major = Number(match[1]);
+    const version = stanza.match(/^Version: (\d+\.\d+\.\d+)/m)?.[1];
+    if (major > maxMajor) {
+      maxMajor = major;
+      releaseVersionsOfMax.length = 0;
+      if (version) releaseVersionsOfMax.push(version);
+    } else if (major === maxMajor && version) {
+      releaseVersionsOfMax.push(version);
+    }
+  }
+  if (maxMajor === 0) {
     throw new Error(`no gfortran-* packages found in ${GFORTRAN_APT_INDEX_URL}`);
   }
-  const latestVersion = String(Math.max(...majors));
+  const latestVersion =
+    releaseVersionsOfMax.length > 0
+      ? maxVersion(releaseVersionsOfMax)
+      : String(maxMajor);
   return { compiler: "gfortran-apt", latestVersion, url: GFORTRAN_APT_INDEX_URL };
 }
 
