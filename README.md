@@ -1,8 +1,33 @@
 # fc-update-notifier
 
-Checks daily whether new releases of
-Fortran compilers have been published on their respective distribution
-channels:
+Checks for new Fortran compiler (FC) releases daily.
+
+**Watch this repository to get notified when a new release is detected.**
+
+All [sources](#sources) are checked via GitHub Actions. When a new compiler version is detected, an issue is created, notifying repository watchers.
+
+## Usage
+
+Requires Node.js 20 or later.
+
+List all versions:
+
+```sh
+npm run latest
+```
+
+List latest version of a specific compiler:
+
+```sh
+npm run latest -- ifx
+```
+
+Check for new releases and update local state:
+```sh
+npm run check
+```
+
+## Sources
 
 | Compiler | Checked Source |
 | --- | --- |
@@ -15,16 +40,3 @@ channels:
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
 | lfortran | https://api.anaconda.org/package/conda-forge/lfortran |
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
-
-The checks run on a schedule via a GitHub Actions workflow
-[`.github/workflows/check.yml`](.github/workflows/check.yml). The last-seen version of each compiler is stored in [`data/state.json`](data/state.json).
-
-## Usage
-
-Requires Node.js >= 20 (uses the built-in `fetch`).
-
-```sh
-npm run check              # check for new releases
-npm run latest             # print latest versions, e.g. "ifx 2026.1.1"
-npm run latest -- ifx      # print only the version: "2026.1.1"
-```
