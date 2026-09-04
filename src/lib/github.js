@@ -1,9 +1,9 @@
 /**
- * GitHub notifications: per compiler source TWO tracking issues — one for
- * new-release detections (a "feature" to implement downstream, closed when
- * done) and one for check failures (a "bug" to fix, closed when the
- * checker is repaired). Both receive repeated events as comments, so each
- * kind exists at most once per source (max 2 issues per source).
+ * GitHub notifications: per compiler source a new-release tracking issue (a
+ * "feature" to implement downstream, closed when done — max 9) plus, for
+ * check failures (a "bug" to fix, closed when the checker is repaired),
+ * per-source threads capped at MAX_FAILURE_ISSUES open issues to keep
+ * breakage storms bounded. Both kinds receive repeated events as comments.
  *
  * Identified by exact title (no labels — this repo's issue list is ours).
  * Uses the REST API directly (no deps).
@@ -17,21 +17,23 @@
 
 const API_ROOT = "https://api.github.com";
 
+/** Upper bound on simultaneously open per-source check-failure issues. */
+export const MAX_FAILURE_ISSUES = 5;
+const FAILURE_SUFFIX = " — check failures";
+
 const JSON_HEADERS = {
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
 };
 
 export const issueTitle = (kind, compiler) =>
-  kind === "release"
-    ? `${compiler} — new releases`
-    : `${compiler} — check failures`;
+  kind === "release" ? `${compiler} — new releases` : `${compiler}${FAILURE_SUFFIX}`;
 
 const ISSUE_INTRO = {
   release:
     "Tracking issue for new releases of the `{compiler}` compiler source, maintained by the daily check. Comment when a newer version appears; close once setup-fortran (or whatever consumes it) is updated.",
   error:
-    "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. A while this issue is open the source is broken (page moved, parser drifted, ...); fix the checker in fc-update-notifier and close.",
+    "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker in fc-update-notifier and close.",
 };
 
 function runLink() {
@@ -94,6 +96,12 @@ async function fetchOpenIssues(repo, token) {
  * leaves the release undelivered and retried on the next run. `problems`
  * lists notification errors that must mark the run as failed.
  *
+ * New release threads are unlimited (one per source). A failing source is
+ * always reported, but once MAX_FAILURE_ISSUES failure threads are open,
+ * further failing sources only appear in the step summary and the run's
+ * exit code — no new issues are created (existing threads still get
+ * comments).
+ *
  * @param {{ kind: "release" | "error", compiler: string }[]} events
  * @returns {Promise<{ delivered: Set<string>, problems: { compiler: string, err: unknown }[] }>}
  */
@@ -120,6 +128,9 @@ export async function notifyCompilerEvents(events) {
   }
 
   const openIssues = await fetchOpenIssues(repo, token);
+  let failureThreads = [...openIssues.keys()].filter((title) =>
+    title.endsWith(FAILURE_SUFFIX),
+  ).length;
   for (const event of events) {
     const title = issueTitle(event.kind, event.compiler);
     const body = renderEventBody(event);
@@ -132,6 +143,16 @@ export async function notifyCompilerEvents(events) {
           body: { body },
         });
         console.log(`Commented on #${existing} (${title})`);
+      } else if (
+        event.kind === "error" &&
+        failureThreads >= MAX_FAILURE_ISSUES
+      ) {
+        console.log(
+          `Skipped failure issue for ${event.compiler}: cap of ${MAX_FAILURE_ISSUES} open failure issues reached — reported in summary only`,
+        );
+        summaryLines.push(
+          `- \`${event.compiler}\`: check failed (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`,
+        );
       } else {
         const intro = ISSUE_INTRO[event.kind].replaceAll(
           "{compiler}",
@@ -146,6 +167,7 @@ export async function notifyCompilerEvents(events) {
           },
         });
         openIssues.set(title, created.number);
+        if (event.kind === "error") failureThreads += 1;
         console.log(`Created issue #${created.number} (${title})`);
       }
       if (event.kind === "release") delivered.add(event.compiler);
