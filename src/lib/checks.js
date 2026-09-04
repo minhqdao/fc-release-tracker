@@ -5,15 +5,15 @@
 
 import { checkAOCC } from "../check-aocc.js";
 import { checkArmflang } from "../check-armflang.js";
-import { checkNvfortran } from "../check-nvfortran.js";
 import { checkIfx } from "../check-ifx.js";
+import { checkNvfortran } from "../check-nvfortran.js";
 
 /** @type {Readonly<Record<string, () => Promise<{ compiler: string, latestVersion: string, url: string }>>>} */
 export const CHECKS = Object.freeze({
   aocc: checkAOCC,
   armflang: checkArmflang,
-  nvfortran: checkNvfortran,
   ifx: checkIfx,
+  nvfortran: checkNvfortran,
 });
 
 /**

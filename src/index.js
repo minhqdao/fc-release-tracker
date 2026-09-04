@@ -22,8 +22,8 @@ const STATE_PATH = path.join(
 const DEFAULT_STATE = {
   aocc: null,
   armflang: null,
-  nvfortran: null,
   ifx: null,
+  nvfortran: null,
 };
 
 /** Load last-seen versions; fall back to defaults if the file is missing. */

@@ -8,8 +8,8 @@ channels:
 | --- | --- |
 | aocc | https://developer.amd.com/amd-aocc/ |
 | armflang | https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages |
-| nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
+| nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
 
 The checks run on a schedule via a GitHub Actions workflow
 [`.github/workflows/check.yml`](.github/workflows/check.yml). The last-seen version of each compiler
