@@ -20,8 +20,9 @@ version newer than the stored one, a new issue is created.
 Requires Node.js >= 20 (uses the built-in `fetch`).
 
 ```sh
-npm run check              # run all checks
-npm run check:<compiler>   # run a single checker
+npm run check              # check for new releases
+npm run latest             # print latest versions, e.g. "ifx 2026.1.1"
+npm run latest -- ifx      # print only the version: "2026.1.1"
 ```
 
 ## Implementation Notes

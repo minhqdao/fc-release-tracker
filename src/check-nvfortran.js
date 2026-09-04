@@ -23,7 +23,7 @@ export async function checkNvfortran() {
   return { compiler: "nvfortran", latestVersion, url: NVPFORTRAN_PAGE_URL };
 }
 
-// Allow running standalone: npm run check:nvfortran
+// Allow running standalone: node src/check-nvfortran.js
 if (import.meta.url === `file://${process.argv[1]}`) {
   checkNvfortran()
     .then((result) => console.log(JSON.stringify(result, null, 2)))

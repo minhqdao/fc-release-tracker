@@ -20,7 +20,7 @@ export async function checkAOCC() {
   return { compiler: "aocc", latestVersion, url: AOCC_PAGE_URL };
 }
 
-// Allow running standalone: npm run check:aocc
+// Allow running standalone: node src/check-aocc.js
 if (import.meta.url === `file://${process.argv[1]}`) {
   checkAOCC()
     .then((result) => console.log(JSON.stringify(result, null, 2)))

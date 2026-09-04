@@ -8,13 +8,11 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { checkAOCC } from "./check-aocc.js";
-import { checkNvfortran } from "./check-nvfortran.js";
-import { checkIfx } from "./check-ifx.js";
+import { CHECKS } from "./lib/checks.js";
 import { isNewer } from "./lib/version.js";
 import { notifyNewReleases } from "./lib/github.js";
 
-const CHECKS = [checkAOCC, checkNvfortran, checkIfx];
+const CHECK_FNS = Object.values(CHECKS);
 
 const STATE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -45,7 +43,7 @@ export async function saveState(state) {
 export async function main() {
   const state = await loadState();
 
-  const results = await Promise.allSettled(CHECKS.map((check) => check()));
+  const results = await Promise.allSettled(CHECK_FNS.map((check) => check()));
   const failures = results.filter((r) => r.status === "rejected");
   const checks = results.flatMap((r) =>
     r.status === "fulfilled" ? [r.value] : [],

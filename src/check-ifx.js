@@ -23,7 +23,7 @@ export async function checkIfx() {
   return { compiler: "ifx", latestVersion, url: IFX_PAGE_URL };
 }
 
-// Allow running standalone: npm run check:ifx
+// Allow running standalone: node src/check-ifx.js
 if (import.meta.url === `file://${process.argv[1]}`) {
   checkIfx()
     .then((result) => console.log(JSON.stringify(result, null, 2)))
