@@ -19,7 +19,12 @@ const STATE_PATH = path.join(
   "state.json",
 );
 
-const DEFAULT_STATE = { aocc: null, nvfortran: null, ifx: null };
+const DEFAULT_STATE = {
+  aocc: null,
+  armflang: null,
+  nvfortran: null,
+  ifx: null,
+};
 
 /** Load last-seen versions; fall back to defaults if the file is missing. */
 export async function loadState() {

@@ -7,6 +7,7 @@ channels:
 | Compiler | Checked Source |
 | --- | --- |
 | aocc | https://developer.amd.com/amd-aocc/ |
+| armflang | https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages |
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
 
