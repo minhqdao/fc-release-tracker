@@ -1,26 +1,31 @@
 /**
  * Intel ifx (Intel Fortran Compiler) release checker.
  *
- * Source of truth: Intel oneAPI releases. The ifx compiler ships inside the
- * oneAPI HPC Toolkit; release versions are listed on Intel's documentation
- * pages (e.g. https://www.intel.com/content/www/us/en/developer/articles/tool/release-notes-ifx.html)
- * TODO: confirm the most reliable page to scrape.
+ * Source of truth: the `intel-fortran-rt` package Intel publishes to PyPI —
+ * the Fortran runtime is versioned in lockstep with the compiler itself
+ * (e.g. 2026.1.1), giving a small, structured JSON API instead of scraping
+ * Intel's marketing CMS.
+ * Cross-checks performed while choosing this channel:
+ *   - Intel's apt repo names packages `intel-fortran-compiler-<version>` but
+ *     only at major.minor granularity — patch updates never appear there.
+ *   - PyPI `intel-cmplr-lib-rt` carries the same version (lib+compiler ship
+ *     together); `intel-fortran-rt` is the closest to the compiler itself.
  */
 
-import { fetchText, extractLatestVersion } from "./lib/http.js";
+import { fetchText } from "./lib/http.js";
 
-export const IFX_PAGE_URL =
-  "https://www.intel.com/content/www/us/en/developer/articles/tool/release-notes-ifx.html";
+export const IFX_PYPI_URL = "https://pypi.org/pypi/intel-fortran-rt/json";
 
 /**
  * @returns {Promise<{ compiler: "ifx", latestVersion: string, url: string }>}
  */
 export async function checkIfx() {
-  // TODO: fetch the ifx release notes and parse the latest version
-  // (e.g. "2025.2").
-  const body = await fetchText(IFX_PAGE_URL);
-  const latestVersion = extractLatestVersion(body);
-  return { compiler: "ifx", latestVersion, url: IFX_PAGE_URL };
+  const data = JSON.parse(await fetchText(IFX_PYPI_URL));
+  const latestVersion = data.info?.version;
+  if (!/^\d{4}\.\d/.test(latestVersion ?? "")) {
+    throw new Error(`unexpected intel-fortran-rt version in ${IFX_PYPI_URL}`);
+  }
+  return { compiler: "ifx", latestVersion, url: IFX_PYPI_URL };
 }
 
 // Allow running standalone: node src/check-ifx.js

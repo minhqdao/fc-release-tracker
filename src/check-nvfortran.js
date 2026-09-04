@@ -1,26 +1,30 @@
 /**
  * NVIDIA nvfortran (HPC SDK) release checker.
  *
- * Source of truth: https://developer.nvidia.com/hpc-sdk releases, or the
- * NVIDIA HPC SDK release notes / downloads page.
- * TODO: confirm the most reliable page or feed to scrape (release notes
- * changelog is a good candidate).
+ * Source of truth: the Sphinx docs of the latest NVIDIA HPC SDK, whose page
+ * title carries the version (https://docs.nvidia.com/hpc-sdk/release-notes/).
  */
 
-import { fetchText, extractLatestVersion } from "./lib/http.js";
+import { fetchText } from "./lib/http.js";
 
-export const NVPFORTRAN_PAGE_URL =
-  "https://developer.nvidia.com/hpc-sdk-downloads";
+export const NVFORTRAN_PAGE_URL =
+  "https://docs.nvidia.com/hpc-sdk/release-notes/index.html";
 
 /**
  * @returns {Promise<{ compiler: "nvfortran", latestVersion: string, url: string }>}
  */
 export async function checkNvfortran() {
-  // TODO: fetch the HPC SDK page and parse the latest version
-  // (e.g. "25.7" or "25.7.0").
-  const body = await fetchText(NVPFORTRAN_PAGE_URL);
-  const latestVersion = extractLatestVersion(body);
-  return { compiler: "nvfortran", latestVersion, url: NVPFORTRAN_PAGE_URL };
+  // The Sphinx page title is always "<...> — HPC SDK Release Notes <ver> documentation"
+  // and points at the docs of the newest SDK, which ships nvfortran.
+  const body = await fetchText(NVFORTRAN_PAGE_URL);
+  const match = body.match(
+    /HPC SDK Release Notes\s+(\d+\.\d+(?:\.\d+)?)\s+documentation/i,
+  );
+  if (!match) {
+    throw new Error(`no HPC SDK release marker found on ${NVFORTRAN_PAGE_URL}`);
+  }
+  const latestVersion = match[1];
+  return { compiler: "nvfortran", latestVersion, url: NVFORTRAN_PAGE_URL };
 }
 
 // Allow running standalone: node src/check-nvfortran.js
