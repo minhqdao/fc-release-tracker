@@ -1,0 +1,46 @@
+/**
+ * LLVM Flang (flang) release checker.
+ *
+ * Source of truth: the latest stable GitHub Release of llvm/llvm-project.
+ * Unlike gfortran's distro-packaged channels, all flang distribution
+ * channels used by setup-fortran (apt.llvm.org, official GitHub release
+ * installers/assets, Homebrew) mirror this single upstream release train,
+ * so one entry suffices.
+ *
+ * The reported version is the full `major.minor.patch` from the
+ * `llvmorg-<major>.<minor>.<patch>` tag (e.g. "23.1.0"), keeping the same
+ * parse-and-compare granularity as every other channel; a new major is
+ * still the event requiring action in setup-fortran's tables, while
+ * point releases provide precise history and catch asset-drift early.
+ */
+
+import { fetchText } from "./lib/http.js";
+
+export const FLANG_GITHUB_URL =
+  "https://api.github.com/repos/llvm/llvm-project/releases/latest";
+
+/**
+ * @returns {Promise<{ compiler: "flang", latestVersion: string, url: string }>}
+ */
+export async function checkFlang() {
+  const data = JSON.parse(await fetchText(FLANG_GITHUB_URL));
+  const latestVersion = /^llvmorg-(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.~+-]+)?$/.exec(
+    String(data.tag_name),
+  )?.[1];
+  if (!latestVersion) {
+    throw new Error(
+      `unexpected LLVM release tag in ${FLANG_GITHUB_URL}: ${String(data.tag_name)}`,
+    );
+  }
+  return { compiler: "flang", latestVersion, url: FLANG_GITHUB_URL };
+}
+
+// Allow running standalone: node src/check-flang.js
+if (import.meta.url === `file://${process.argv[1]}`) {
+  checkFlang()
+    .then((result) => console.log(JSON.stringify(result, null, 2)))
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    });
+}

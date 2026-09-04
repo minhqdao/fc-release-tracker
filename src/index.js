@@ -22,6 +22,7 @@ const STATE_PATH = path.join(
 const DEFAULT_STATE = {
   aocc: null,
   armflang: null,
+  flang: null,
   "gfortran-apt": null,
   "gfortran-brew": null,
   "gfortran-winlibs": null,

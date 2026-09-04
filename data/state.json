@@ -1,6 +1,7 @@
 {
   "aocc": null,
   "armflang": null,
+  "flang": null,
   "gfortran-apt": null,
   "gfortran-brew": null,
   "gfortran-winlibs": null,
