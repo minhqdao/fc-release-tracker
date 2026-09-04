@@ -5,6 +5,9 @@
 
 import { checkAOCC } from "../check-aocc.js";
 import { checkArmflang } from "../check-armflang.js";
+import { checkGFortranApt } from "../check-gfortran-apt.js";
+import { checkGFortranBrew } from "../check-gfortran-brew.js";
+import { checkGFortranWinlibs } from "../check-gfortran-winlibs.js";
 import { checkIfx } from "../check-ifx.js";
 import { checkLFortran } from "../check-lfortran.js";
 import { checkNvfortran } from "../check-nvfortran.js";
@@ -13,6 +16,9 @@ import { checkNvfortran } from "../check-nvfortran.js";
 export const CHECKS = Object.freeze({
   aocc: checkAOCC,
   armflang: checkArmflang,
+  "gfortran-apt": checkGFortranApt,
+  "gfortran-brew": checkGFortranBrew,
+  "gfortran-winlibs": checkGFortranWinlibs,
   ifx: checkIfx,
   lfortran: checkLFortran,
   nvfortran: checkNvfortran,

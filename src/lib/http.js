@@ -36,6 +36,15 @@ export async function fetchText(url) {
 }
 
 /**
+ * Fetch a URL and return its raw bytes (e.g. gzip-compressed apt indexes).
+ * @param {string} url
+ * @returns {Promise<ArrayBuffer>}
+ */
+export async function fetchBytes(url) {
+  return (await fetchOk(url)).arrayBuffer();
+}
+
+/**
  * Pick the greatest version from a list of candidate strings.
  * Falls back to numeric comparison of dotted numbers so that CalVer
  * schemes ("2026.1.1") compare correctly alongside semver-like ones.

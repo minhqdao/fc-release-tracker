@@ -8,6 +8,9 @@ channels:
 | --- | --- |
 | aocc | https://developer.amd.com/amd-aocc/ |
 | armflang | https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages |
+| gfortran (apt) | https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/main/binary-amd64/Packages.gz |
+| gfortran (brew) | https://formulae.brew.sh/api/formula/gcc.json |
+| gfortran (winlibs) | https://api.github.com/repos/brechtsanders/winlibs_mingw/releases/latest |
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
 | lfortran | https://api.anaconda.org/package/conda-forge/lfortran |
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
