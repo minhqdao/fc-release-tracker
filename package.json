@@ -1,5 +1,5 @@
 {
-  "name": "fc-update-notifier",
+  "name": "fc-release-tracker",
   "version": "0.1.0",
   "description": "Daily checker for new Fortran compiler releases across their respective distribution channels.",
   "type": "module",

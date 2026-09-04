@@ -1,4 +1,4 @@
-# fc-update-notifier
+# fc-release-tracker
 
 Checks for new Fortran compiler (FC) releases daily.
 

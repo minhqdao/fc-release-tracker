@@ -37,7 +37,7 @@ const ISSUE_INTRO = {
   release:
     "Tracking issue for new releases of the `{compiler}` compiler source, maintained by the daily check. Comment when a newer version appears; close once setup-fortran (or whatever consumes it) is updated.",
   error:
-    "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker in fc-update-notifier and close.",
+    "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker and close.",
 };
 
 function runLink() {
