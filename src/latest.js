@@ -4,22 +4,18 @@
  * the daily runner, without touching state or GitHub.
  */
 
-import { CHECKS } from "./lib/checks.js";
+import { CHECKS, runAllChecks } from "./lib/checks.js";
 
 const selected = process.argv.slice(2);
 
 if (selected.length === 0) {
-  const results = await Promise.allSettled(
-    Object.values(CHECKS).map((check) => check()),
-  );
-  for (const [i, result] of results.entries()) {
-    const name = Object.keys(CHECKS)[i];
-    if (result.status === "fulfilled") {
-      console.log(`${name} ${result.value.latestVersion}`);
-    } else {
-      console.error(`${name}: ${result.reason}`);
-      process.exitCode = 1;
-    }
+  const { results, failures } = await runAllChecks();
+  for (const r of results) {
+    console.log(`${r.compiler} ${r.latestVersion}`);
+  }
+  for (const f of failures) {
+    console.error(`${f.name}: ${f.reason}`);
+    process.exitCode = 1;
   }
 } else {
   for (const name of selected) {

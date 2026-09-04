@@ -8,11 +8,9 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { CHECKS } from "./lib/checks.js";
+import { runAllChecks } from "./lib/checks.js";
 import { isNewer } from "./lib/version.js";
 import { notifyNewReleases } from "./lib/github.js";
-
-const CHECK_FNS = Object.values(CHECKS);
 
 const STATE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -43,11 +41,7 @@ export async function saveState(state) {
 export async function main() {
   const state = await loadState();
 
-  const results = await Promise.allSettled(CHECK_FNS.map((check) => check()));
-  const failures = results.filter((r) => r.status === "rejected");
-  const checks = results.flatMap((r) =>
-    r.status === "fulfilled" ? [r.value] : [],
-  );
+  const { results: checks, failures } = await runAllChecks();
 
   const newReleases = checks
     .filter((r) => isNewer(r.latestVersion, state[r.compiler]))
@@ -64,7 +58,7 @@ export async function main() {
   await saveState(nextState);
 
   if (failures.length > 0) {
-    for (const f of failures) console.error("check failed:", f.reason);
+    for (const f of failures) console.error(`${f.name} check failed:`, f.reason);
     // Non-zero exit marks the workflow run red so parser breakage is visible.
     process.exitCode = 1;
   }
