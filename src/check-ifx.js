@@ -24,7 +24,7 @@ export const IFX_PYPI_URL = "https://pypi.org/pypi/intel-fortran-rt/json";
 export function parseIfx(body) {
   const data = JSON.parse(body);
   const latestVersion = data.info?.version;
-  if (!/^\d{4}\.\d/.test(latestVersion ?? "")) {
+  if (!/^\d{4}\.\d+(\.\d+)?$/.test(latestVersion ?? "")) {
     throw new Error(`unexpected intel-fortran-rt version in ${IFX_PYPI_URL}`);
   }
   return latestVersion;

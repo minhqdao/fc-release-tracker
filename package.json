@@ -4,6 +4,7 @@
   "description": "Daily checker for new Fortran compiler releases across their respective distribution channels.",
   "type": "module",
   "license": "MIT",
+  "private": true,
   "main": "src/index.js",
   "scripts": {
     "check": "node src/index.js",

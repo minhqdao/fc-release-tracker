@@ -45,4 +45,4 @@ npm test
 | gfortran (winlibs) | https://api.github.com/repos/brechtsanders/winlibs_mingw/releases/latest |
 | ifx | https://pypi.org/pypi/intel-fortran-rt/json |
 | lfortran | https://api.anaconda.org/package/conda-forge/lfortran |
-| nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/ |
+| nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/index.html |

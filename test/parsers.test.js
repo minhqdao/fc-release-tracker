@@ -264,6 +264,8 @@ describe("parseIfx", () => {
       parseIfx(JSON.stringify({ info: { version: "2026.0.0" } })),
       "2026.0.0",
     );
+    // tolerated shape; lib/version.js compares it as 2026.1
+    assert.equal(parseIfx(JSON.stringify({ info: { version: "2026.1" } })), "2026.1");
   });
 
   it("throws on missing info or unexpected version formats", () => {
@@ -278,6 +280,11 @@ describe("parseIfx", () => {
     // not a 4-digit year
     assert.throws(
       () => parseIfx(JSON.stringify({ info: { version: "26.1.1" } })),
+      /unexpected intel-fortran-rt version/,
+    );
+    // trailing garbage must never reach release tag names
+    assert.throws(
+      () => parseIfx(JSON.stringify({ info: { version: "2026.1.2rc1" } })),
       /unexpected intel-fortran-rt version/,
     );
   });
