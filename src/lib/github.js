@@ -10,9 +10,11 @@
  *
  *   Issues — check failures get per-source tracking threads
  *   ("Error during check: <source>", created as needed), capped at
- *   MAX_FAILURE_ISSUES open issues; existing threads receive repeats as
- *   comments. Issues are the bug channel: if you watch this repo's issues,
- *   everything you see means a checker needs fixing.
+ *   MAX_FAILURE_ISSUES open issues. A thread only receives a comment when
+ *   the error differs from the last one it reported, and it closes
+ *   automatically (with a recovery comment) on the first run where the
+ *   source's check succeeds again. Issues are the bug channel: if you watch
+ *   this repo's issues, everything you see means a checker needs fixing.
  *
  * Identified by exact issue title / tag name (no labels — this repo's issue
  * list is ours). Uses the REST API directly (no deps).
@@ -44,7 +46,7 @@ export const releaseTag = (compiler, version) => `${compiler}/${version}`;
 export const failureIssueTitle = (compiler) => `${FAILURE_PREFIX}${compiler}`;
 
 const FAILURE_INTRO =
-  "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker and close.";
+  "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker — the daily check closes this issue automatically once the source recovers.";
 
 function runLink() {
   const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
@@ -217,23 +219,78 @@ export async function publishReleases(events) {
   return { delivered, problems };
 }
 
+const FIRST_FAILURE_SEPARATOR = "\n\nFirst failure:\n\n";
+
+/** The workflow-run link renderFailureBody appends; differs between runs. */
+function stripRunLink(body) {
+  return body.replace(/\n\nWorkflow run: \S+$/, "");
+}
+
+/**
+ * Normalized error text used for repeat-comment dedup: the rendered failure
+ * body without its workflow-run link (that link differs between runs and
+ * would otherwise defeat byte-identical comparison).
+ */
+export function failureSignature(event) {
+  return stripRunLink(renderFailureBody(event));
+}
+
+/** Render the body of a new failure-tracking issue. */
+export function failureIssueBody(event) {
+  return (
+    FAILURE_INTRO.replaceAll("{compiler}", `\`${event.compiler}\``) +
+    `${FIRST_FAILURE_SEPARATOR}${renderFailureBody(event)}`
+  );
+}
+
+/** Render the comment posted when a failed source's check succeeds again. */
+export function renderRecoveryBody(compiler) {
+  return (
+    `The daily check for \`${compiler}\` succeeded again — closing this ` +
+    "issue as recovered. Reopen it if the source breaks anew." +
+    runLink()
+  );
+}
+
+/**
+ * The error text a failure thread last reported: its last comment, or — for
+ * a thread with no repeat comments yet — the first failure in the issue
+ * body. Normalized the same way as failureSignature.
+ */
+async function lastReportedError(repo, token, issue) {
+  const comments = await api(
+    `/repos/${repo}/issues/${issue.number}/comments?per_page=100`,
+    { token },
+  );
+  if (comments.length > 0) {
+    return stripRunLink(comments[comments.length - 1].body);
+  }
+  const [, firstFailure] = String(issue.body ?? "").split(
+    FIRST_FAILURE_SEPARATOR,
+  );
+  return firstFailure === undefined ? "" : stripRunLink(firstFailure);
+}
+
 /**
  * File every check failure on its per-source tracking issue, creating issues
- * up to MAX_FAILURE_ISSUES. Failures beyond the cap (and existing threads,
- * whatever their number) only show up in the step summary; the run goes red
- * either way via `failures` in index.js.
+ * up to MAX_FAILURE_ISSUES, and close the threads of sources whose check
+ * succeeded again. Repeat failures comment only when the error differs from
+ * the thread's last reported error. Failures beyond the cap (and existing
+ * threads, whatever their number) only show up in the step summary; the run
+ * goes red either way via `failures` in index.js.
  *
  * @param {{ compiler: string, error: unknown }[]} events
  * @returns {Promise<{ problems: { compiler: string, err: unknown }[] }>}
  */
 export async function reportFailures(events) {
   const problems = [];
-  if (events.length === 0) return { problems };
-
   const summaryLines = [];
+  const recoveryLines = [];
+
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPOSITORY;
   if (!token || !repo) {
+    if (events.length === 0) return { problems };
     console.log(
       "GITHUB_TOKEN/GITHUB_REPOSITORY not set — printing failures locally.\n",
     );
@@ -244,51 +301,59 @@ export async function reportFailures(events) {
     return { problems };
   }
 
+  // Always listed, even for an empty failure set: a thread whose source is
+  // absent from this run's failures has recovered and must be closed.
   const openIssues = await api(
     `/repos/${repo}/issues?state=open&per_page=100`,
     { token },
   );
-  const byTitle = new Map(openIssues.map((issue) => [issue.title, issue.number]));
+  const byTitle = new Map(openIssues.map((issue) => [issue.title, issue]));
   let failureThreads = [...byTitle.keys()].filter((title) =>
     title.startsWith(FAILURE_PREFIX),
   ).length;
 
+  const failedToday = new Set(events.map((event) => event.compiler));
+
   for (const event of events) {
     const title = failureIssueTitle(event.compiler);
-    const body = renderFailureBody(event);
     try {
       const existing = byTitle.get(title);
-      let capNote = "";
+      let note = "";
       if (existing) {
-        await api(`/repos/${repo}/issues/${existing}/comments`, {
-          token,
-          method: "POST",
-          body: { body },
-        });
-        console.log(`Commented on #${existing} (${title})`);
+        const lastError = await lastReportedError(repo, token, existing);
+        if (lastError === failureSignature(event)) {
+          console.log(
+            `Skipping repeat comment on #${existing.number} (${title}): same error as last time`,
+          );
+          note = " (same error as last time)";
+        } else {
+          await api(`/repos/${repo}/issues/${existing.number}/comments`, {
+            token,
+            method: "POST",
+            body: { body: renderFailureBody(event) },
+          });
+          console.log(`Commented on #${existing.number} (${title})`);
+        }
       } else if (failureThreads >= MAX_FAILURE_ISSUES) {
         console.log(
           `Skipped failure issue for ${event.compiler}: cap of ${MAX_FAILURE_ISSUES} open failure issues reached — reported in summary only`,
         );
-        capNote = ` (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`;
+        note = ` (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`;
       } else {
         const created = await api(`/repos/${repo}/issues`, {
           token,
           method: "POST",
           body: {
             title,
-            body: `${FAILURE_INTRO.replaceAll(
-              "{compiler}",
-              `\`${event.compiler}\``,
-            )}\n\nFirst failure:\n\n${body}`,
+            body: failureIssueBody(event),
           },
         });
-        byTitle.set(title, created.number);
+        byTitle.set(title, created);
         failureThreads += 1;
         console.log(`Created issue #${created.number} (${title})`);
       }
       summaryLines.push(
-        `- \`${event.compiler}\`: check failed${capNote}${existingUrlNote(byTitle.get(title))}`,
+        `- \`${event.compiler}\`: check failed${note}${existingUrlNote(byTitle.get(title)?.number)}`,
       );
     } catch (err) {
       problems.push({ compiler: event.compiler, err });
@@ -296,13 +361,50 @@ export async function reportFailures(events) {
     }
   }
 
+  // Recovery sweep: a thread whose source is absent from this run's failures
+  // means the source's check succeeded again — comment and close it so
+  // recovered sources free cap slots instead of accumulating.
+  for (const [title, issue] of byTitle) {
+    if (!title.startsWith(FAILURE_PREFIX)) continue;
+    const compiler = title.slice(FAILURE_PREFIX.length);
+    if (failedToday.has(compiler)) continue;
+    try {
+      await api(`/repos/${repo}/issues/${issue.number}/comments`, {
+        token,
+        method: "POST",
+        body: { body: renderRecoveryBody(compiler) },
+      });
+      await api(`/repos/${repo}/issues/${issue.number}`, {
+        token,
+        method: "PATCH",
+        body: { state: "closed" },
+      });
+      const url = issueUrl(issue.number);
+      recoveryLines.push(
+        `- \`${compiler}\`: recovered — closed ${
+          url ? `[#${issue.number}](${url})` : `#${issue.number}`
+        }`,
+      );
+      console.log(`Closed recovered failure issue #${issue.number} (${title})`);
+    } catch (err) {
+      problems.push({ compiler, err });
+      console.error(`failure-issue close failed for ${compiler}:`, err);
+    }
+  }
+
   await appendSummary("## Check failures", summaryLines);
+  await appendSummary("## Recovered sources", recoveryLines);
   return { problems };
 }
 
-function existingUrlNote(number) {
+function issueUrl(number) {
   const server = process.env.GITHUB_SERVER_URL;
   const repo = process.env.GITHUB_REPOSITORY;
-  if (!number || !server || !repo) return "";
-  return ` — tracked in [#${number}](${server}/${repo}/issues/${number})`;
+  if (!number || !server || !repo) return null;
+  return `${server}/${repo}/issues/${number}`;
+}
+
+function existingUrlNote(number) {
+  const url = issueUrl(number);
+  return url ? ` — tracked in [#${number}](${url})` : "";
 }

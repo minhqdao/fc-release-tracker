@@ -6,7 +6,9 @@ import { join } from "node:path";
 
 import {
   MAX_FAILURE_ISSUES,
+  failureIssueBody,
   failureIssueTitle,
+  failureSignature,
   releaseTag,
   renderFailureBody,
   renderReleaseBody,
@@ -103,6 +105,16 @@ describe("renderFailureBody", () => {
     assert.match(body, /fetch failed: 404/);
     assert.match(body, /Source: see checker/);
   });
+
+  it("normalizes the signature by stripping the workflow-run link", () => {
+    const event = { compiler: "ifx", error: new Error("boom") };
+    process.env.GITHUB_SERVER_URL = "https://github.com";
+    process.env.GITHUB_REPOSITORY = "o/r";
+    process.env.GITHUB_RUN_ID = "42";
+    const signature = failureSignature(event);
+    assert.doesNotMatch(signature, /Workflow run:/);
+    assert.match(signature, /Error: boom/);
+  });
 });
 
 describe("reportFailures", () => {
@@ -114,12 +126,26 @@ describe("reportFailures", () => {
   ];
 
   /** Stub the GitHub REST API and record every call. */
-  function mockGitHubApi(issueList, calls) {
+  function mockGitHubApi({ issues = [], commentsByNumber = {} } = {}, calls) {
     const originalFetch = global.fetch;
     global.fetch = async (url, opts) => {
-      calls.push({ url: String(url), opts });
-      if (String(url).includes("/issues?state=open")) {
-        return { ok: true, json: async () => issueList };
+      const u = String(url);
+      calls.push({ url: u, opts });
+      if (u.includes("/issues?state=open")) {
+        return { ok: true, json: async () => issues };
+      }
+      const commentsMatch = /\/issues\/(\d+)\/comments/.exec(u);
+      if (commentsMatch && (!opts?.method || opts.method === "GET")) {
+        return {
+          ok: true,
+          json: async () => commentsByNumber[commentsMatch[1]] ?? [],
+        };
+      }
+      if (opts?.method === "POST" && /\/issues\/\d+\/comments$/.test(u)) {
+        return { ok: true, json: async () => ({}) };
+      }
+      if (opts?.method === "PATCH" && /\/issues\/\d+$/.test(u)) {
+        return { ok: true, json: async () => ({}) };
       }
       return { ok: true, json: async () => ({ number: 99 }) };
     };
@@ -128,13 +154,11 @@ describe("reportFailures", () => {
     };
   }
 
-  /** Run one event through reportFailures with stubbed API and env. */
-  async function runWithMocks(issueList, summaryPath, event) {
+  /** Run events through reportFailures with stubbed API and env. */
+  async function runWithMocks(stubs, summaryPath, events) {
     const calls = [];
-    const restoreFetch = mockGitHubApi(issueList, calls);
-    const saved = Object.fromEntries(
-      ENV_KEYS.map((k) => [k, process.env[k]]),
-    );
+    const restoreFetch = mockGitHubApi(stubs, calls);
+    const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
     Object.assign(process.env, {
       GITHUB_TOKEN: "t",
       GITHUB_REPOSITORY: "o/r",
@@ -142,7 +166,7 @@ describe("reportFailures", () => {
       GITHUB_STEP_SUMMARY: summaryPath,
     });
     try {
-      const result = await reportFailures([event]);
+      const result = await reportFailures(events);
       return { result, calls };
     } finally {
       restoreFetch();
@@ -153,19 +177,34 @@ describe("reportFailures", () => {
     }
   }
 
+  /** Summary lines of one named `## <header>` section. */
+  function sectionLines(summary, header) {
+    const start = summary.indexOf(`## ${header}`);
+    if (start === -1) return [];
+    const rest = summary.slice(start + `## ${header}`.length);
+    const end = rest.indexOf("\n## ");
+    return (end === -1 ? rest : rest.slice(0, end))
+      .split("\n")
+      .filter((l) => l.startsWith("- `"));
+  }
+
   it("creates the issue and links it once when under the cap", async () => {
     const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
     try {
       const { result, calls } = await runWithMocks(
-        [],
+        { issues: [] },
         join(dir, "summary.md"),
-        { compiler: "aocc", error: "boom" },
+        [{ compiler: "aocc", error: "boom" }],
       );
       assert.equal(result.problems.length, 0);
-      assert.ok(calls.some((c) => /\/issues$/.test(c.url)));
+      assert.ok(
+        calls.some(
+          (c) => /\/issues$/.test(c.url) && c.opts?.method === "POST",
+        ),
+      );
 
       const summary = await readFile(join(dir, "summary.md"), "utf8");
-      const lines = summary.split("\n").filter((l) => l.startsWith("- `"));
+      const lines = sectionLines(summary, "Check failures");
       assert.equal(lines.length, 1);
       assert.match(lines[0], /`aocc`: check failed — tracked in \[#99\]/);
       assert.ok(calls[0].opts.signal instanceof AbortSignal);
@@ -178,17 +217,20 @@ describe("reportFailures", () => {
     const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
     try {
       const { result, calls } = await runWithMocks(
-        Array.from({ length: MAX_FAILURE_ISSUES }, (_, i) => ({
-          number: i + 1,
-          title: `Error during check: source${i}`,
-        })),
+        {
+          issues: Array.from({ length: MAX_FAILURE_ISSUES }, (_, i) => ({
+            number: i + 1,
+            title: `Error during check: source${i}`,
+            body: "stale thread",
+          })),
+        },
         join(dir, "summary.md"),
-        { compiler: "newsrc", error: "boom" },
+        [{ compiler: "newsrc", error: "boom" }],
       );
       assert.equal(result.problems.length, 0);
 
       const summary = await readFile(join(dir, "summary.md"), "utf8");
-      const lines = summary.split("\n").filter((l) => l.startsWith("- `"));
+      const lines = sectionLines(summary, "Check failures");
       assert.equal(lines.length, 1);
       assert.match(
         lines[0],
@@ -200,6 +242,170 @@ describe("reportFailures", () => {
         false,
       );
       assert.ok(calls[0].opts.signal instanceof AbortSignal);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("closes recovered threads with a recovery comment, comment first", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
+    try {
+      const { result, calls } = await runWithMocks(
+        {
+          issues: [
+            { number: 7, title: "Error during check: stale", body: "intro" },
+          ],
+        },
+        join(dir, "summary.md"),
+        [], // nothing failed this run: the stale thread has recovered
+      );
+      assert.equal(result.problems.length, 0);
+
+      const commentIdx = calls.findIndex(
+        (c) =>
+          c.opts?.method === "POST" && /\/issues\/7\/comments$/.test(c.url),
+      );
+      const closeIdx = calls.findIndex(
+        (c) => c.opts?.method === "PATCH" && /\/issues\/7$/.test(c.url),
+      );
+      assert.ok(commentIdx !== -1, "recovery comment posted");
+      assert.ok(closeIdx !== -1, "issue closed");
+      assert.ok(commentIdx < closeIdx, "comment before close");
+      assert.deepEqual(JSON.parse(calls[closeIdx].opts.body), {
+        state: "closed",
+      });
+
+      const summary = await readFile(join(dir, "summary.md"), "utf8");
+      const recovered = sectionLines(summary, "Recovered sources");
+      assert.equal(recovered.length, 1);
+      assert.match(recovered[0], /`stale`: recovered — closed \[#7\]/);
+      assert.equal(sectionLines(summary, "Check failures").length, 0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips the repeat comment when the error matches the thread's last reported error", async () => {
+    const event = {
+      compiler: "aocc",
+      error: new Error("no AOCC release marker found"),
+    };
+    const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
+    try {
+      const { result, calls } = await runWithMocks(
+        {
+          issues: [
+            { number: 3, title: "Error during check: aocc", body: "intro" },
+          ],
+          commentsByNumber: {
+            3: [
+              {
+                // stored by a previous run with a different run link —
+                // the link must not defeat the comparison
+                body:
+                  failureSignature(event) +
+                  "\n\nWorkflow run: https://github.com/o/r/actions/runs/42",
+              },
+            ],
+          },
+        },
+        join(dir, "summary.md"),
+        [event],
+      );
+      assert.equal(result.problems.length, 0);
+      assert.equal(
+        calls.some(
+          (c) => c.opts?.method === "POST" && /\/comments$/.test(c.url),
+        ),
+        false,
+      );
+
+      const summary = await readFile(join(dir, "summary.md"), "utf8");
+      const lines = sectionLines(summary, "Check failures");
+      assert.equal(lines.length, 1);
+      assert.match(lines[0], /`aocc`: check failed \(same error as last time\)/);
+      assert.match(lines[0], /tracked in \[#3\]/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("comments again when the error differs from the last reported one", async () => {
+    const event = { compiler: "aocc", error: new Error("brand new breakage") };
+    const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
+    try {
+      const { result, calls } = await runWithMocks(
+        {
+          issues: [
+            { number: 3, title: "Error during check: aocc", body: "intro" },
+          ],
+          commentsByNumber: {
+            3: [
+              {
+                body:
+                  failureSignature({
+                    compiler: "aocc",
+                    error: new Error("old breakage"),
+                  }) +
+                  "\n\nWorkflow run: https://github.com/o/r/actions/runs/42",
+              },
+            ],
+          },
+        },
+        join(dir, "summary.md"),
+        [event],
+      );
+      assert.equal(result.problems.length, 0);
+      assert.equal(
+        calls.filter(
+          (c) => c.opts?.method === "POST" && /\/comments$/.test(c.url),
+        ).length,
+        1,
+      );
+
+      const summary = await readFile(join(dir, "summary.md"), "utf8");
+      const lines = sectionLines(summary, "Check failures");
+      assert.match(lines[0], /`aocc`: check failed — tracked in \[#3\]/);
+      assert.doesNotMatch(lines[0], /same error/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("dedups against the issue body when the thread has no comments yet", async () => {
+    const event = {
+      compiler: "ifx",
+      error: new Error("unexpected intel-fortran-rt version"),
+    };
+    const dir = await mkdtemp(join(tmpdir(), "fc-github-test-"));
+    try {
+      const { result, calls } = await runWithMocks(
+        {
+          issues: [
+            {
+              number: 5,
+              title: "Error during check: ifx",
+              body:
+                failureIssueBody(event) +
+                "\n\nWorkflow run: https://github.com/o/r/actions/runs/41",
+            },
+          ],
+          commentsByNumber: { 5: [] },
+        },
+        join(dir, "summary.md"),
+        [event],
+      );
+      assert.equal(result.problems.length, 0);
+      assert.equal(
+        calls.some(
+          (c) => c.opts?.method === "POST" && /\/comments$/.test(c.url),
+        ),
+        false,
+      );
+
+      const summary = await readFile(join(dir, "summary.md"), "utf8");
+      const lines = sectionLines(summary, "Check failures");
+      assert.match(lines[0], /same error as last time/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

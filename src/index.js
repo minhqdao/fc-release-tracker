@@ -2,8 +2,8 @@
  * Entry point: runs all compiler checks, diffs against the last-seen
  * versions in data/state.json, publishes every genuinely new version as a
  * GitHub Release (watchers with the "Releases" subscription get them) and
- * files check failures as capped tracking issues, then persists the state of
- * successfully delivered releases.
+ * files check failures as capped, auto-closing tracking issues, then
+ * persists the state of successfully delivered releases.
  */
 
 import { runAllChecks } from "./lib/checks.js";
