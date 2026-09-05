@@ -1,5 +1,5 @@
 /**
- * Central registry of compiler checks, shared by the daily check runner
+ * Central registry of compiler checks, shared by the scheduled check runner
  * (index.js) and the `latest` CLI.
  */
 

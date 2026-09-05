@@ -1,6 +1,6 @@
 /**
  * Last-seen version state, persisted in-repo at data/state.json so the
- * daily run can diff against the previous run across git history.
+ * scheduled runs can diff against the previous run across git history.
  */
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";

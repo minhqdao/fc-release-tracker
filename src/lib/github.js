@@ -46,7 +46,7 @@ export const releaseTag = (compiler, version) => `${compiler}/${version}`;
 export const failureIssueTitle = (compiler) => `${FAILURE_PREFIX}${compiler}`;
 
 const FAILURE_INTRO =
-  "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker — the daily check closes this issue automatically once the source recovers.";
+  "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the scheduled check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker — the scheduled check closes this issue automatically once the source recovers.";
 
 function runLink() {
   const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
@@ -57,7 +57,7 @@ function runLink() {
 /** Render a check failure as Markdown (issue body/comment). */
 export function renderFailureBody(event) {
   return [
-    `The daily check for \`${event.compiler}\` failed.`,
+    `The scheduled check for \`${event.compiler}\` failed.`,
     "",
     "```",
     String(event.error?.stack ?? event.error),
@@ -246,7 +246,7 @@ export function failureIssueBody(event) {
 /** Render the comment posted when a failed source's check succeeds again. */
 export function renderRecoveryBody(compiler) {
   return (
-    `The daily check for \`${compiler}\` succeeded again — closing this ` +
+    `The scheduled check for \`${compiler}\` succeeded again — closing this ` +
     "issue as recovered. Reopen it if the source breaks anew." +
     runLink()
   );

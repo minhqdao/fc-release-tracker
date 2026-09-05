@@ -1,7 +1,7 @@
 /**
  * CLI: print the latest version of a compiler (or all compilers) and
  * nothing else, e.g. `latest ifx` -> "2026.1.1". Reuses the same checks as
- * the daily runner, without touching state or GitHub.
+ * the scheduled runner, without touching state or GitHub.
  */
 
 import { CHECKS, runAllChecks } from "./lib/checks.js";
