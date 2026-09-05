@@ -21,3 +21,6 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Smoke-test all checkers against the live sources
+        run: npm run latest
