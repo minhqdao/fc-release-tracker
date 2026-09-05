@@ -1,7 +1,33 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { isNewer } from "../src/lib/version.js";
+import { compareVersions, isNewer } from "../src/lib/version.js";
+
+describe("compareVersions", () => {
+  it("orders versions three-way", () => {
+    assert.equal(compareVersions("1.2.3", "1.2.3"), 0);
+    assert.equal(compareVersions("25.10", "25.7"), 1);
+    assert.equal(compareVersions("25.7", "25.10"), -1);
+    assert.equal(compareVersions("16.1.0", "16"), 1);
+    assert.equal(compareVersions("16", "16.1.0"), -1);
+  });
+
+  it("never produces NaN for non-numeric segments", () => {
+    // segments compare as strings — deterministic, unlike the old
+    // Number()-based ordering maxVersion used before the consolidation
+    assert.equal(compareVersions("1.0.0-rc1", "1.0.0-rc2"), -1);
+    assert.equal(compareVersions("1.0.0-rc2", "1.0.0-rc1"), 1);
+    assert.equal(compareVersions("5.2.beta", "5.2.0"), 1);
+    assert.equal(compareVersions("5.2.0", "5.2.beta"), -1);
+  });
+
+  it("splits on dots, dashes, and plus signs consistently", () => {
+    // the two pre-consolidation implementations disagreed here
+    assert.equal(compareVersions("1.2-3", "1.2.3"), 0);
+    assert.equal(compareVersions("1.2+3", "1.2.3"), 0);
+    assert.equal(compareVersions("1.2-3", "1.2+3"), 0);
+  });
+});
 
 describe("isNewer", () => {
   it("counts a first observed version (null current) as newer", () => {

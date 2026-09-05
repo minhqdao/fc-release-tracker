@@ -4,6 +4,8 @@
  * Intentionally dependency-free: uses Node's built-in fetch.
  */
 
+import { compareVersions } from "./version.js";
+
 const USER_AGENT = "Mozilla/5.0";
 
 export const FETCH_TIMEOUT_MS = 30_000;
@@ -45,32 +47,26 @@ export async function fetchBytes(url) {
 }
 
 /**
- * Pick the greatest version from a list of candidate strings.
- * Falls back to numeric comparison of dotted numbers so that CalVer
- * schemes ("2026.1.1") compare correctly alongside semver-like ones.
- * Candidates must be dotted numeric versions — every caller regex-filters
- * its inputs before calling.
+ * Pick the greatest version from a list of candidate strings, ordered by
+ * lib/version.js. Candidates must be dotted numeric versions — every caller
+ * regex-filters its inputs before calling. Deterministic on any input:
+ * numerically equal spellings ("16.1" vs "16.1.0") tie-break
+ * lexicographically toward the more specific one, and non-numeric segments
+ * compare as strings instead of collapsing to NaN.
  * @param {string[]} candidates
  * @returns {string}
  */
 export function maxVersion(candidates) {
-  const seen = new Set(candidates);
-  const parsed = [...seen].map((v) => ({
-    v,
-    parts: v.split(/[.-]/).map(Number),
-  }));
-  parsed.sort((a, b) => {
-    const len = Math.max(a.parts.length, b.parts.length);
-    for (let i = 0; i < len; i++) {
-      const d = (b.parts[i] ?? 0) - (a.parts[i] ?? 0);
-      if (d !== 0) return d;
-    }
-    // Numerically equal but differently spelled ("16.1" vs "16.1.0"): pick
-    // deterministically so the result never depends on input order.
-    return a.v < b.v ? 1 : a.v > b.v ? -1 : 0;
-  });
-  if (parsed.length === 0) {
+  const seen = [...new Set(candidates)];
+  if (seen.length === 0) {
     throw new Error("no version candidates found");
   }
-  return parsed[0].v;
+  seen.sort((a, b) => {
+    const order = compareVersions(b, a); // descending
+    if (order !== 0) return order;
+    // Numerically equal but differently spelled ("16.1" vs "16.1.0"): pick
+    // deterministically so the result never depends on input order.
+    return a < b ? 1 : a > b ? -1 : 0;
+  });
+  return seen[0];
 }

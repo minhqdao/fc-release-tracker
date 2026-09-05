@@ -36,6 +36,16 @@ describe("maxVersion", () => {
     assert.equal(maxVersion(["16", "16.1", "16.1.0"]), "16.1.0");
   });
 
+  it("treats dashes and plus signs like dots, same as isNewer", () => {
+    assert.equal(maxVersion(["1.2.3", "1.2-3"]), "1.2.3");
+    assert.equal(maxVersion(["1.2+3", "1.2.3"]), "1.2.3");
+  });
+
+  it("orders non-numeric segments as strings, deterministically", () => {
+    assert.equal(maxVersion(["1.0.0-rc1", "1.0.0-rc2"]), "1.0.0-rc2");
+    assert.equal(maxVersion(["1.0.0-rc2", "1.0.0-rc1"]), "1.0.0-rc2");
+  });
+
   it("throws when there are no candidates", () => {
     assert.throws(() => maxVersion([]), /no version candidates found/);
   });
