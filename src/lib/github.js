@@ -1,26 +1,36 @@
 /**
- * GitHub notifications: per compiler source a new-release tracking issue (a
- * "feature" to implement downstream, closed when done — max 9) plus, for
- * check failures (a "bug" to fix, closed when the checker is repaired),
- * per-source threads capped at MAX_FAILURE_ISSUES open issues to keep
- * breakage storms bounded. Both kinds receive repeated events as comments.
+ * GitHub notifications with two channels, so watchers can subscribe
+ * selectively:
  *
- * Identified by exact title ("New Release: <source>" / "Error during
- * check: <source>"; no labels — this repo's issue list is ours).
- * Uses the REST API directly (no deps).
+ *   Releases — every newly detected compiler version is published as a
+ *   first-class GitHub Release, tagged "<compiler>/<version>". Publishing is
+ *   idempotent (the tag name is the (compiler, version) identity): a release
+ *   that already exists counts as delivered, so a partial failure retried on
+ *   the next run never duplicates and never sticks.
+ *
+ *   Issues — check failures get per-source tracking threads
+ *   ("Error during check: <source>", created as needed), capped at
+ *   MAX_FAILURE_ISSUES open issues; existing threads receive repeats as
+ *   comments. Issues are the bug channel: if you watch this repo's issues,
+ *   everything you see means a checker needs fixing.
+ *
+ * Identified by exact issue title / tag name (no labels — this repo's issue
+ * list is ours). Uses the REST API directly (no deps).
  *
  * Required env when running in GitHub Actions (set by the workflow):
  *   GITHUB_TOKEN       - the workflow's github.token
  *   GITHUB_REPOSITORY  - "owner/name" (set automatically by Actions)
+ *   GITHUB_SHA         - commit the new release tags are anchored to
  *
  * Without those (local runs) events are only printed.
  */
+
+import { execFileSync } from "node:child_process";
 
 const API_ROOT = "https://api.github.com";
 
 /** Upper bound on simultaneously open per-source check-failure issues. */
 export const MAX_FAILURE_ISSUES = 5;
-const RELEASE_PREFIX = "New Release: ";
 const FAILURE_PREFIX = "Error during check: ";
 
 const JSON_HEADERS = {
@@ -28,17 +38,11 @@ const JSON_HEADERS = {
   "X-GitHub-Api-Version": "2022-11-28",
 };
 
-export const issueTitle = (kind, compiler) =>
-  kind === "release"
-    ? `${RELEASE_PREFIX}${compiler}`
-    : `${FAILURE_PREFIX}${compiler}`;
+export const releaseTag = (compiler, version) => `${compiler}/${version}`;
+export const failureIssueTitle = (compiler) => `${FAILURE_PREFIX}${compiler}`;
 
-const ISSUE_INTRO = {
-  release:
-    "Tracking issue for new releases of the `{compiler}` compiler source, maintained by the daily check. Comment when a newer version appears; close once setup-fortran (or whatever consumes it) is updated.",
-  error:
-    "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker and close.",
-};
+const FAILURE_INTRO =
+  "Tracking issue for check failures of the `{compiler}` compiler source, maintained by the daily check. While this issue is open the source is broken (page moved, parser drifted, ...); fix the checker and close.";
 
 function runLink() {
   const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
@@ -46,17 +50,8 @@ function runLink() {
   return `\n\nWorkflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
 }
 
-/** Render one event (release detection or check failure) as Markdown. */
-export function renderEventBody(event) {
-  if (event.kind === "release") {
-    return [
-      `A new release was detected for \`${event.compiler}\`.`,
-      "",
-      `- previous: \`${event.previousVersion ?? "not recorded"}\``,
-      `- latest: **\`${event.latestVersion}\`**`,
-      `- source: ${event.url}`,
-    ].join("\n");
-  }
+/** Render a check failure as Markdown (issue body/comment). */
+export function renderFailureBody(event) {
   return [
     `The daily check for \`${event.compiler}\` failed.`,
     "",
@@ -65,6 +60,25 @@ export function renderEventBody(event) {
     "```",
     `Source: ${event.url ?? "see checker"}`,
   ].join("\n") + runLink();
+}
+
+/** Render the release notes body for a new compiler release. */
+export function renderReleaseBody(event) {
+  return [
+    `A new release was detected for \`${event.compiler}\`.`,
+    "",
+    `- previous: \`${event.previousVersion ?? "not recorded"}\``,
+    `- new: **\`${event.latestVersion}\`**`,
+    `- source: ${event.url}`,
+  ].join("\n") + runLink();
+}
+
+/** Error carrying the HTTP status so callers can branch on 404/422. */
+class GitHubApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
 }
 
 async function api(path, { token, method = "GET", body } = {}) {
@@ -78,68 +92,167 @@ async function api(path, { token, method = "GET", body } = {}) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
-    throw new Error(
+    throw new GitHubApiError(
       `GitHub API ${method} ${path} failed: ${res.status} ${await res.text()}`,
+      res.status,
     );
   }
   return res.json();
 }
 
-/** Map issue title -> number for all open issues (one request). */
-async function fetchOpenIssues(repo, token) {
-  const data = await api(`/repos/${repo}/issues?state=open&per_page=100`, {
-    token,
-  });
-  return new Map(data.map((issue) => [issue.title, issue.number]));
+function isStatus(err, status) {
+  return err instanceof GitHubApiError && err.status === status;
+}
+
+/** Commit the new release tags anchor to. */
+function headSha() {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+}
+
+async function hasRelease(repo, token, tag) {
+  try {
+    return await api(`/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`, {
+      token,
+    });
+  } catch (err) {
+    if (isStatus(err, 404)) return null;
+    throw err;
+  }
+}
+
+async function appendSummary(header, lines) {
+  const path = process.env.GITHUB_STEP_SUMMARY;
+  if (!path || lines.length === 0) return;
+  const fs = await import("node:fs/promises");
+  await fs.appendFile(path, `${header}\n\n${lines.join("\n")}\n`);
 }
 
 /**
- * Post every event to the issue of its (kind, compiler) thread, creating it
- * on first touch. Release events delivered successfully are returned in
- * `delivered` so the caller can persist their new state; a failed post
- * leaves the release undelivered and retried on the next run. `problems`
- * lists notification errors that must mark the run as failed.
+ * Publish every new release event as a GitHub Release (idempotent, see the
+ * module comment). Returns compilers whose release is delivered (created or
+ * already present) so the caller can persist their state; delivery failures
+ * land in `problems` and retry untouched on the next run.
  *
- * New release threads are unlimited (one per source). A failing source is
- * always reported, but once MAX_FAILURE_ISSUES failure threads are open,
- * further failing sources only appear in the step summary and the run's
- * exit code — no new issues are created (existing threads still get
- * comments).
- *
- * @param {{ kind: "release" | "error", compiler: string }[]} events
+ * @param {{ compiler: string, previousVersion: string|null, latestVersion: string, url: string }[]} events
  * @returns {Promise<{ delivered: Set<string>, problems: { compiler: string, err: unknown }[] }>}
  */
-export async function notifyCompilerEvents(events) {
+export async function publishReleases(events) {
   const delivered = new Set();
   const problems = [];
   if (events.length === 0) return { delivered, problems };
 
-  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   const summaryLines = [];
-
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPOSITORY;
   if (!token || !repo) {
     console.log(
-      "GITHUB_TOKEN/GITHUB_REPOSITORY not set — printing events locally.\n",
+      "GITHUB_TOKEN/GITHUB_REPOSITORY not set — printing releases locally.\n",
     );
     for (const event of events) {
-      console.log(`--- ${event.compiler} (${event.kind}) ---`);
-      console.log(renderEventBody(event), "\n");
-      if (event.kind === "release") delivered.add(event.compiler);
+      console.log(`--- release ${event.compiler} ${event.latestVersion} ---`);
+      console.log(renderReleaseBody(event), "\n");
+      delivered.add(event.compiler);
     }
     return { delivered, problems };
   }
 
-  const openIssues = await fetchOpenIssues(repo, token);
-  let failureThreads = [...openIssues.keys()].filter((title) =>
+  for (const event of events) {
+    const tag = releaseTag(event.compiler, event.latestVersion);
+    try {
+      let release = await hasRelease(repo, token, tag);
+      if (release) {
+        console.log(`Release ${tag} already published — treated as delivered`);
+      } else {
+        // Anchor the tag on HEAD unless a (partially retried) earlier attempt
+        // already placed it; a retry keeps the existing ref either way.
+        const sha = headSha();
+        try {
+          await api(`/repos/${repo}/git/ref/tags/${encodeURIComponent(tag)}`, {
+            token,
+          });
+          console.log(`Tag ${tag} already exists — reusing its anchor`);
+        } catch (err) {
+          if (!isStatus(err, 404)) throw err;
+          await api(`/repos/${repo}/git/refs`, {
+            token,
+            method: "POST",
+            body: { ref: `refs/tags/${tag}`, sha },
+          });
+        }
+        try {
+          release = await api(`/repos/${repo}/releases`, {
+            token,
+            method: "POST",
+            body: {
+              tag_name: tag,
+              name: `${event.compiler} ${event.latestVersion}`,
+              body: renderReleaseBody(event),
+            },
+          });
+          console.log(`Published release ${tag} (#${release.html_url})`);
+        } catch (err) {
+          if (!isStatus(err, 422)) throw err;
+          release = await hasRelease(repo, token, tag);
+          if (!release) throw err;
+          console.log(`Release ${tag} raced in — treated as delivered`);
+        }
+      }
+      delivered.add(event.compiler);
+      summaryLines.push(
+        `- [\`${event.compiler}\` **${event.latestVersion}**](${release.html_url}) (was \`${event.previousVersion ?? "unknown"}\`)`,
+      );
+    } catch (err) {
+      problems.push({ compiler: event.compiler, err });
+      console.error(`release publication failed for ${event.compiler}:`, err);
+    }
+  }
+
+  await appendSummary("## New releases", summaryLines);
+  return { delivered, problems };
+}
+
+/**
+ * File every check failure on its per-source tracking issue, creating issues
+ * up to MAX_FAILURE_ISSUES. Failures beyond the cap (and existing threads,
+ * whatever their number) only show up in the step summary; the run goes red
+ * either way via `failures` in index.js.
+ *
+ * @param {{ compiler: string, error: unknown }[]} events
+ * @returns {Promise<{ problems: { compiler: string, err: unknown }[] }>}
+ */
+export async function reportFailures(events) {
+  const problems = [];
+  if (events.length === 0) return { problems };
+
+  const summaryLines = [];
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (!token || !repo) {
+    console.log(
+      "GITHUB_TOKEN/GITHUB_REPOSITORY not set — printing failures locally.\n",
+    );
+    for (const event of events) {
+      console.log(`--- failure ${event.compiler} ---`);
+      console.log(renderFailureBody(event), "\n");
+    }
+    return { problems };
+  }
+
+  const openIssues = await api(
+    `/repos/${repo}/issues?state=open&per_page=100`,
+    { token },
+  );
+  const byTitle = new Map(openIssues.map((issue) => [issue.title, issue.number]));
+  let failureThreads = [...byTitle.keys()].filter((title) =>
     title.startsWith(FAILURE_PREFIX),
   ).length;
+
   for (const event of events) {
-    const title = issueTitle(event.kind, event.compiler);
-    const body = renderEventBody(event);
+    const title = failureIssueTitle(event.compiler);
+    const body = renderFailureBody(event);
     try {
-      const existing = openIssues.get(title);
+      const existing = byTitle.get(title);
       if (existing) {
         await api(`/repos/${repo}/issues/${existing}/comments`, {
           token,
@@ -147,10 +260,7 @@ export async function notifyCompilerEvents(events) {
           body: { body },
         });
         console.log(`Commented on #${existing} (${title})`);
-      } else if (
-        event.kind === "error" &&
-        failureThreads >= MAX_FAILURE_ISSUES
-      ) {
+      } else if (failureThreads >= MAX_FAILURE_ISSUES) {
         console.log(
           `Skipped failure issue for ${event.compiler}: cap of ${MAX_FAILURE_ISSUES} open failure issues reached — reported in summary only`,
         );
@@ -158,38 +268,37 @@ export async function notifyCompilerEvents(events) {
           `- \`${event.compiler}\`: check failed (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`,
         );
       } else {
-        const intro = ISSUE_INTRO[event.kind].replaceAll(
-          "{compiler}",
-          `\`${event.compiler}\``,
-        );
         const created = await api(`/repos/${repo}/issues`, {
           token,
           method: "POST",
           body: {
             title,
-            body: `${intro}\n\nFirst event:\n\n${body}`,
+            body: `${FAILURE_INTRO.replaceAll(
+              "{compiler}",
+              `\`${event.compiler}\``,
+            )}\n\nFirst failure:\n\n${body}`,
           },
         });
-        openIssues.set(title, created.number);
-        if (event.kind === "error") failureThreads += 1;
+        byTitle.set(title, created.number);
+        failureThreads += 1;
         console.log(`Created issue #${created.number} (${title})`);
       }
-      if (event.kind === "release") delivered.add(event.compiler);
       summaryLines.push(
-        `- \`${event.compiler}\`: ${event.kind === "release" ? `new release **${event.latestVersion}**` : "check failed"}`,
+        `- \`${event.compiler}\`: check failed${existingUrlNote(byTitle.get(title))}`,
       );
     } catch (err) {
       problems.push({ compiler: event.compiler, err });
-      console.error(`notification failed for ${event.compiler}:`, err);
+      console.error(`failure notification failed for ${event.compiler}:`, err);
     }
   }
 
-  if (summaryPath && summaryLines.length > 0) {
-    const fs = await import("node:fs/promises");
-    await fs.appendFile(
-      summaryPath,
-      `## Compiler events\n\n${summaryLines.join("\n")}\n`,
-    );
-  }
-  return { delivered, problems };
+  await appendSummary("## Check failures", summaryLines);
+  return { problems };
+}
+
+function existingUrlNote(number) {
+  const server = process.env.GITHUB_SERVER_URL;
+  const repo = process.env.GITHUB_REPOSITORY;
+  if (!number || !server || !repo) return "";
+  return ` — tracked in [#${number}](${server}/${repo}/issues/${number})`;
 }
