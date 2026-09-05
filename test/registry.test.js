@@ -14,10 +14,11 @@ describe("CHECKS registry", () => {
     assert.deepEqual(keys, [...keys].sort());
   });
 
-  it("covers exactly the state keys", () => {
+  it("derives DEFAULT_STATE: one frozen null last-seen slot per check", () => {
+    assert.ok(Object.isFrozen(DEFAULT_STATE));
     assert.deepEqual(
-      Object.keys(CHECKS).sort(),
-      Object.keys(DEFAULT_STATE).sort(),
+      DEFAULT_STATE,
+      Object.fromEntries(Object.keys(CHECKS).map((key) => [key, null])),
     );
   });
 

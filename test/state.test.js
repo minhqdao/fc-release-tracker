@@ -3,8 +3,21 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { DEFAULT_STATE, loadState, saveState } from "../src/lib/state.js";
+import { DEFAULT_STATE, STATE_PATH, loadState, saveState } from "../src/lib/state.js";
+
+const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
+
+describe("STATE_PATH", () => {
+  it("points at the committed data/state.json in the repo root", async () => {
+    // Regression guard: state.js once resolved this to src/data/state.json
+    // after moving from src/index.js, which loadState's ENOENT fallback
+    // silently masked as "no state yet".
+    assert.equal(STATE_PATH, join(REPO_ROOT, "data", "state.json"));
+    await readFile(STATE_PATH, "utf8"); // the committed file must exist
+  });
+});
 
 /** Run `fn` with a fresh throwaway directory, cleaned up afterwards. */
 async function withTempDir(fn) {

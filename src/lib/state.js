@@ -7,24 +7,25 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { CHECKS } from "./checks.js";
+
+// Two levels up: this module lives in src/lib/, the state file in <root>/data.
 export const STATE_PATH = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
+  "..",
   "..",
   "data",
   "state.json",
 );
 
-export const DEFAULT_STATE = {
-  aocc: null,
-  armflang: null,
-  flang: null,
-  "gfortran-apt": null,
-  "gfortran-brew": null,
-  "gfortran-winlibs": null,
-  ifx: null,
-  lfortran: null,
-  nvfortran: null,
-};
+/**
+ * Last-seen-version slots, one per registered check, derived from the CHECKS
+ * registry: adding compiler #10 only means adding a checker file and a
+ * registry entry (plus a README row) — never touching this module.
+ */
+export const DEFAULT_STATE = Object.freeze(
+  Object.fromEntries(Object.keys(CHECKS).map((key) => [key, null])),
+);
 
 /** Load last-seen versions; fall back to defaults if the file is missing. */
 export async function loadState(statePath = STATE_PATH) {
