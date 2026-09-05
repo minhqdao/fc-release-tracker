@@ -13,10 +13,11 @@ import { fetchText, maxVersion } from "./lib/http.js";
 export const AOCC_PAGE_URL = "https://developer.amd.com/amd-aocc/";
 
 /**
- * @returns {Promise<{ compiler: "aocc", latestVersion: string, url: string }>}
+ * Extract the latest AOCC version from the page HTML.
+ * @param {string} body
+ * @returns {string} latest version, e.g. "5.2"
  */
-export async function checkAOCC() {
-  const body = await fetchText(AOCC_PAGE_URL);
+export function parseAOCC(body) {
   const candidates = [
     ...body.matchAll(/aocc[-_ ]compiler[-_ ](\d+\.\d+(?:\.\d+)?)/gi),
   ].map((m) => m[1]);
@@ -30,7 +31,14 @@ export async function checkAOCC() {
       `unexpected AOCC patch release "${latest}" — AOCC is major.minor only, review parsing`,
     );
   }
-  const latestVersion = `${major}.${minor}`;
+  return `${major}.${minor}`;
+}
+
+/**
+ * @returns {Promise<{ compiler: "aocc", latestVersion: string, url: string }>}
+ */
+export async function checkAOCC() {
+  const latestVersion = parseAOCC(await fetchText(AOCC_PAGE_URL));
   return { compiler: "aocc", latestVersion, url: AOCC_PAGE_URL };
 }
 

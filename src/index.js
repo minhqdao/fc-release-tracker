@@ -6,49 +6,10 @@
  * successfully delivered releases.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
 import { runAllChecks } from "./lib/checks.js";
 import { isNewer } from "./lib/version.js";
+import { loadState, saveState } from "./lib/state.js";
 import { publishReleases, reportFailures } from "./lib/github.js";
-
-const STATE_PATH = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "data",
-  "state.json",
-);
-
-const DEFAULT_STATE = {
-  aocc: null,
-  armflang: null,
-  flang: null,
-  "gfortran-apt": null,
-  "gfortran-brew": null,
-  "gfortran-winlibs": null,
-  ifx: null,
-  lfortran: null,
-  nvfortran: null,
-};
-
-/** Load last-seen versions; fall back to defaults if the file is missing. */
-export async function loadState() {
-  try {
-    const raw = await readFile(STATE_PATH, "utf8");
-    return { ...DEFAULT_STATE, ...JSON.parse(raw) };
-  } catch (err) {
-    if (err.code === "ENOENT") return { ...DEFAULT_STATE };
-    throw err;
-  }
-}
-
-/** Persist last-seen versions to disk. */
-export async function saveState(state) {
-  await mkdir(path.dirname(STATE_PATH), { recursive: true });
-  await writeFile(STATE_PATH, JSON.stringify(state, null, 2) + "\n");
-}
 
 export async function main() {
   const state = await loadState();

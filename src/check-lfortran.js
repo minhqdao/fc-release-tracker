@@ -14,17 +14,26 @@ export const LFORTRAN_CONDA_URL =
   "https://api.anaconda.org/package/conda-forge/lfortran";
 
 /**
- * @returns {Promise<{ compiler: "lfortran", latestVersion: string, url: string }>}
+ * Extract the latest dotted version from the Anaconda.org JSON body.
+ * @param {string} body
+ * @returns {string} latest version, e.g. "0.65.0"
  */
-export async function checkLFortran() {
-  const data = JSON.parse(await fetchText(LFORTRAN_CONDA_URL));
+export function parseLFortran(body) {
+  const data = JSON.parse(body);
   const candidates = (data.versions ?? []).filter((v) =>
     /^\d+\.\d+(\.\d+)?$/.test(v),
   );
   if (candidates.length === 0) {
     throw new Error(`no lfortran versions found at ${LFORTRAN_CONDA_URL}`);
   }
-  const latestVersion = maxVersion(candidates);
+  return maxVersion(candidates);
+}
+
+/**
+ * @returns {Promise<{ compiler: "lfortran", latestVersion: string, url: string }>}
+ */
+export async function checkLFortran() {
+  const latestVersion = parseLFortran(await fetchText(LFORTRAN_CONDA_URL));
   return { compiler: "lfortran", latestVersion, url: LFORTRAN_CONDA_URL };
 }
 

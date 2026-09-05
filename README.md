@@ -25,6 +25,14 @@ Check for new releases and update local state:
 npm run check
 ```
 
+## Development
+
+Run the test suite:
+
+```sh
+npm test
+```
+
 ## Sources
 
 | Compiler | Checked Source |

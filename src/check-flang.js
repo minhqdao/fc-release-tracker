@@ -20,10 +20,12 @@ export const FLANG_GITHUB_URL =
   "https://api.github.com/repos/llvm/llvm-project/releases/latest";
 
 /**
- * @returns {Promise<{ compiler: "flang", latestVersion: string, url: string }>}
+ * Extract the latest LLVM version from the /releases/latest JSON body.
+ * @param {string} body
+ * @returns {string} latest version, e.g. "23.1.0"
  */
-export async function checkFlang() {
-  const data = JSON.parse(await fetchText(FLANG_GITHUB_URL));
+export function parseFlang(body) {
+  const data = JSON.parse(body);
   const latestVersion = /^llvmorg-(\d+\.\d+\.\d+)(?:-[A-Za-z0-9.~+-]+)?$/.exec(
     String(data.tag_name),
   )?.[1];
@@ -32,6 +34,14 @@ export async function checkFlang() {
       `unexpected LLVM release tag in ${FLANG_GITHUB_URL}: ${String(data.tag_name)}`,
     );
   }
+  return latestVersion;
+}
+
+/**
+ * @returns {Promise<{ compiler: "flang", latestVersion: string, url: string }>}
+ */
+export async function checkFlang() {
+  const latestVersion = parseFlang(await fetchText(FLANG_GITHUB_URL));
   return { compiler: "flang", latestVersion, url: FLANG_GITHUB_URL };
 }
 

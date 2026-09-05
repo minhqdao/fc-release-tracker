@@ -15,10 +15,11 @@ export const ARMFLANG_PACKAGES_URL =
   "https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages";
 
 /**
- * @returns {Promise<{ compiler: "armflang", latestVersion: string, url: string }>}
+ * Extract the latest arm-toolchain-for-linux version from a Packages index.
+ * @param {string} text
+ * @returns {string} latest version, e.g. "22.1"
  */
-export async function checkArmflang() {
-  const text = await fetchText(ARMFLANG_PACKAGES_URL);
+export function parseArmflang(text) {
   const candidates = text
     .split(/\n\s*\n/)
     .filter((stanza) => /^Package: arm-toolchain-for-linux$/m.test(stanza))
@@ -29,7 +30,14 @@ export async function checkArmflang() {
       `no arm-toolchain-for-linux packages found in ${ARMFLANG_PACKAGES_URL}`,
     );
   }
-  const latestVersion = maxVersion(candidates);
+  return maxVersion(candidates);
+}
+
+/**
+ * @returns {Promise<{ compiler: "armflang", latestVersion: string, url: string }>}
+ */
+export async function checkArmflang() {
+  const latestVersion = parseArmflang(await fetchText(ARMFLANG_PACKAGES_URL));
   return { compiler: "armflang", latestVersion, url: ARMFLANG_PACKAGES_URL };
 }
 

@@ -15,16 +15,26 @@ export const GFORTRAN_WINLIBS_URL =
   "https://api.github.com/repos/brechtsanders/winlibs_mingw/releases/latest";
 
 /**
- * @returns {Promise<{ compiler: "gfortran-winlibs", latestVersion: string, url: string }>}
+ * Extract the GCC version from the release JSON body (title, fallback: tag).
+ * @param {string} body
+ * @returns {string} latest version, e.g. "16.2.0"
  */
-export async function checkGFortranWinlibs() {
-  const data = JSON.parse(await fetchText(GFORTRAN_WINLIBS_URL));
+export function parseGFortranWinlibs(body) {
+  const data = JSON.parse(body);
   const latestVersion =
     /^GCC (\d+\.\d+(?:\.\d+)?)/.exec(String(data.name))?.[1] ??
     /^(\d+\.\d+\.\d+)/.exec(String(data.tag_name))?.[1];
   if (!latestVersion) {
     throw new Error(`no GCC version found in winlibs release at ${GFORTRAN_WINLIBS_URL}`);
   }
+  return latestVersion;
+}
+
+/**
+ * @returns {Promise<{ compiler: "gfortran-winlibs", latestVersion: string, url: string }>}
+ */
+export async function checkGFortranWinlibs() {
+  const latestVersion = parseGFortranWinlibs(await fetchText(GFORTRAN_WINLIBS_URL));
   return { compiler: "gfortran-winlibs", latestVersion, url: GFORTRAN_WINLIBS_URL };
 }
 

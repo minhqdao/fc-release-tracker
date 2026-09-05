@@ -23,11 +23,11 @@ export const GFORTRAN_APT_INDEX_URL =
   "https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/main/binary-amd64/Packages.gz";
 
 /**
- * @returns {Promise<{ compiler: "gfortran-apt", latestVersion: string, url: string }>}
+ * Extract the latest gfortran version from a decompressed Packages index.
+ * @param {string} text
+ * @returns {string} latest version, e.g. "16" (snapshot-only major) or "16.1.0"
  */
-export async function checkGFortranApt() {
-  const raw = await fetchBytes(GFORTRAN_APT_INDEX_URL);
-  const text = gunzipSync(new Uint8Array(raw)).toString("utf8");
+export function parseGFortranApt(text) {
   let maxMajor = 0;
   /** @type {string[]} */
   const releaseVersionsOfMax = [];
@@ -47,10 +47,18 @@ export async function checkGFortranApt() {
   if (maxMajor === 0) {
     throw new Error(`no gfortran-* packages found in ${GFORTRAN_APT_INDEX_URL}`);
   }
-  const latestVersion =
-    releaseVersionsOfMax.length > 0
-      ? maxVersion(releaseVersionsOfMax)
-      : String(maxMajor);
+  return releaseVersionsOfMax.length > 0
+    ? maxVersion(releaseVersionsOfMax)
+    : String(maxMajor);
+}
+
+/**
+ * @returns {Promise<{ compiler: "gfortran-apt", latestVersion: string, url: string }>}
+ */
+export async function checkGFortranApt() {
+  const raw = await fetchBytes(GFORTRAN_APT_INDEX_URL);
+  const text = gunzipSync(new Uint8Array(raw)).toString("utf8");
+  const latestVersion = parseGFortranApt(text);
   return { compiler: "gfortran-apt", latestVersion, url: GFORTRAN_APT_INDEX_URL };
 }
 

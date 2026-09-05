@@ -13,16 +13,26 @@ import { fetchText } from "./lib/http.js";
 export const GFORTRAN_BREW_URL = "https://formulae.brew.sh/api/formula/gcc.json";
 
 /**
- * @returns {Promise<{ compiler: "gfortran-brew", latestVersion: string, url: string }>}
+ * Extract the stable gcc version from the formula JSON body.
+ * @param {string} body
+ * @returns {string} latest version, e.g. "16.2.0"
  */
-export async function checkGFortranBrew() {
-  const data = JSON.parse(await fetchText(GFORTRAN_BREW_URL));
+export function parseGFortranBrew(body) {
+  const data = JSON.parse(body);
   const latestVersion = data.versions?.stable;
   if (typeof latestVersion !== "string" || !/^\d+\.\d+(\.\d+)?$/.test(latestVersion)) {
     throw new Error(
       `unexpected brew gcc stable version in ${GFORTRAN_BREW_URL}: ${String(latestVersion)}`,
     );
   }
+  return latestVersion;
+}
+
+/**
+ * @returns {Promise<{ compiler: "gfortran-brew", latestVersion: string, url: string }>}
+ */
+export async function checkGFortranBrew() {
+  const latestVersion = parseGFortranBrew(await fetchText(GFORTRAN_BREW_URL));
   return { compiler: "gfortran-brew", latestVersion, url: GFORTRAN_BREW_URL };
 }
 

@@ -17,14 +17,24 @@ import { fetchText } from "./lib/http.js";
 export const IFX_PYPI_URL = "https://pypi.org/pypi/intel-fortran-rt/json";
 
 /**
- * @returns {Promise<{ compiler: "ifx", latestVersion: string, url: string }>}
+ * Extract the compiler version from the PyPI JSON body.
+ * @param {string} body
+ * @returns {string} latest version, e.g. "2026.1.1"
  */
-export async function checkIfx() {
-  const data = JSON.parse(await fetchText(IFX_PYPI_URL));
+export function parseIfx(body) {
+  const data = JSON.parse(body);
   const latestVersion = data.info?.version;
   if (!/^\d{4}\.\d/.test(latestVersion ?? "")) {
     throw new Error(`unexpected intel-fortran-rt version in ${IFX_PYPI_URL}`);
   }
+  return latestVersion;
+}
+
+/**
+ * @returns {Promise<{ compiler: "ifx", latestVersion: string, url: string }>}
+ */
+export async function checkIfx() {
+  const latestVersion = parseIfx(await fetchText(IFX_PYPI_URL));
   return { compiler: "ifx", latestVersion, url: IFX_PYPI_URL };
 }
 
