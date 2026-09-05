@@ -6,7 +6,7 @@
 
 const USER_AGENT = "Mozilla/5.0";
 
-const FETCH_TIMEOUT_MS = 30_000;
+export const FETCH_TIMEOUT_MS = 30_000;
 
 /**
  * Fetch a URL with the shared UA/timeout policy and return the Response
@@ -73,16 +73,4 @@ export function maxVersion(candidates) {
     throw new Error("no version candidates found");
   }
   return parsed[0].v;
-}
-
-/**
- * Generic fallback: highest dotted version (>= 2 components) in the text.
- * @param {string} body - raw page content
- * @returns {string} latest version, e.g. "5.2.0"
- */
-export function extractLatestVersion(body) {
-  const candidates = [...body.matchAll(/\b(\d+\.\d+(?:\.\d+)*)\b/g)].map(
-    (m) => m[1],
-  );
-  return maxVersion(candidates);
 }

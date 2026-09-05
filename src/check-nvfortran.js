@@ -6,6 +6,7 @@
  */
 
 import { fetchText } from "./lib/http.js";
+import { runStandalone } from "./lib/standalone.js";
 
 export const NVFORTRAN_PAGE_URL =
   "https://docs.nvidia.com/hpc-sdk/release-notes/index.html";
@@ -36,11 +37,4 @@ export async function checkNvfortran() {
 }
 
 // Allow running standalone: node src/check-nvfortran.js
-if (import.meta.url === `file://${process.argv[1]}`) {
-  checkNvfortran()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
-    .catch((err) => {
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+runStandalone(import.meta.url, checkNvfortran);

@@ -9,6 +9,7 @@
  */
 
 import { fetchText } from "./lib/http.js";
+import { runStandalone } from "./lib/standalone.js";
 
 export const GFORTRAN_BREW_URL = "https://formulae.brew.sh/api/formula/gcc.json";
 
@@ -37,11 +38,4 @@ export async function checkGFortranBrew() {
 }
 
 // Allow running standalone: node src/check-gfortran-brew.js
-if (import.meta.url === `file://${process.argv[1]}`) {
-  checkGFortranBrew()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
-    .catch((err) => {
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+runStandalone(import.meta.url, checkGFortranBrew);

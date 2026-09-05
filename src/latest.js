@@ -18,8 +18,14 @@ if (selected.length === 0) {
     process.exitCode = 1;
   }
 } else {
-  for (const name of selected) {
+  // Fire all requested checks concurrently, then report in the order the
+  // compilers were requested.
+  const pending = selected.map((name) => {
     const check = CHECKS[name];
+    return { name, check, result: check ? check() : undefined };
+  });
+
+  for (const { name, check, result } of pending) {
     if (!check) {
       const known = Object.keys(CHECKS).join(", ");
       console.error(`unknown compiler "${name}" (known: ${known})`);
@@ -27,7 +33,7 @@ if (selected.length === 0) {
       continue;
     }
     try {
-      const { latestVersion } = await check();
+      const { latestVersion } = await result;
       console.log(latestVersion);
     } catch (err) {
       console.error(`${name}: ${err}`);

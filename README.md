@@ -1,6 +1,6 @@
 # fc-release-tracker
 
-Tracks new Fortran compiler (FC) versions as they become available. The [installation sources](#sources) are monitored via a scheduled job in GitHub Actions, and a GitHub Release is published for each newly detected compiler version.
+Tracks new Fortran compiler (FC) versions as they become available. All [sources](#sources) are monitored via a scheduled job in GitHub Actions, and a GitHub Release is published for each newly detected compiler version.
 
 **Activate Watch → Custom → Releases to get notified of new compiler versions.**
 

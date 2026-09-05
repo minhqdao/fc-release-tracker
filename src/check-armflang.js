@@ -10,6 +10,7 @@
  */
 
 import { fetchText, maxVersion } from "./lib/http.js";
+import { runStandalone } from "./lib/standalone.js";
 
 export const ARMFLANG_PACKAGES_URL =
   "https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages";
@@ -42,11 +43,4 @@ export async function checkArmflang() {
 }
 
 // Allow running standalone: node src/check-armflang.js
-if (import.meta.url === `file://${process.argv[1]}`) {
-  checkArmflang()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
-    .catch((err) => {
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+runStandalone(import.meta.url, checkArmflang);

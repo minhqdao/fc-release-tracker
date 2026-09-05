@@ -27,6 +27,8 @@
 
 import { execFileSync } from "node:child_process";
 
+import { FETCH_TIMEOUT_MS } from "./http.js";
+
 const API_ROOT = "https://api.github.com";
 
 /** Upper bound on simultaneously open per-source check-failure issues. */
@@ -89,6 +91,9 @@ async function api(path, { token, method = "GET", body } = {}) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
+    // Same timeout policy as the checker page fetches: a hung connection
+    // must not stall the workflow until the job-level limit.
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   if (!res.ok) {
@@ -253,6 +258,7 @@ export async function reportFailures(events) {
     const body = renderFailureBody(event);
     try {
       const existing = byTitle.get(title);
+      let capNote = "";
       if (existing) {
         await api(`/repos/${repo}/issues/${existing}/comments`, {
           token,
@@ -264,9 +270,7 @@ export async function reportFailures(events) {
         console.log(
           `Skipped failure issue for ${event.compiler}: cap of ${MAX_FAILURE_ISSUES} open failure issues reached — reported in summary only`,
         );
-        summaryLines.push(
-          `- \`${event.compiler}\`: check failed (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`,
-        );
+        capNote = ` (failure-issue cap ${MAX_FAILURE_ISSUES} reached)`;
       } else {
         const created = await api(`/repos/${repo}/issues`, {
           token,
@@ -284,7 +288,7 @@ export async function reportFailures(events) {
         console.log(`Created issue #${created.number} (${title})`);
       }
       summaryLines.push(
-        `- \`${event.compiler}\`: check failed${existingUrlNote(byTitle.get(title))}`,
+        `- \`${event.compiler}\`: check failed${capNote}${existingUrlNote(byTitle.get(title))}`,
       );
     } catch (err) {
       problems.push({ compiler: event.compiler, err });

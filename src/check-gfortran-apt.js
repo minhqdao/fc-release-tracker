@@ -18,6 +18,7 @@
 import { gunzipSync } from "node:zlib";
 
 import { fetchBytes, maxVersion } from "./lib/http.js";
+import { runStandalone } from "./lib/standalone.js";
 
 export const GFORTRAN_APT_INDEX_URL =
   "https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/main/binary-amd64/Packages.gz";
@@ -63,11 +64,4 @@ export async function checkGFortranApt() {
 }
 
 // Allow running standalone: node src/check-gfortran-apt.js
-if (import.meta.url === `file://${process.argv[1]}`) {
-  checkGFortranApt()
-    .then((result) => console.log(JSON.stringify(result, null, 2)))
-    .catch((err) => {
-      console.error(err);
-      process.exitCode = 1;
-    });
-}
+runStandalone(import.meta.url, checkGFortranApt);
