@@ -48,6 +48,8 @@ export async function fetchBytes(url) {
  * Pick the greatest version from a list of candidate strings.
  * Falls back to numeric comparison of dotted numbers so that CalVer
  * schemes ("2026.1.1") compare correctly alongside semver-like ones.
+ * Candidates must be dotted numeric versions — every caller regex-filters
+ * its inputs before calling.
  * @param {string[]} candidates
  * @returns {string}
  */
@@ -63,7 +65,9 @@ export function maxVersion(candidates) {
       const d = (b.parts[i] ?? 0) - (a.parts[i] ?? 0);
       if (d !== 0) return d;
     }
-    return 0;
+    // Numerically equal but differently spelled ("16.1" vs "16.1.0"): pick
+    // deterministically so the result never depends on input order.
+    return a.v < b.v ? 1 : a.v > b.v ? -1 : 0;
   });
   if (parsed.length === 0) {
     throw new Error("no version candidates found");

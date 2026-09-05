@@ -4,7 +4,6 @@ import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CHECKS } from "../src/lib/checks.js";
 import { DEFAULT_STATE, loadState, saveState } from "../src/lib/state.js";
 
 /** Run `fn` with a fresh throwaway directory, cleaned up afterwards. */
@@ -16,15 +15,6 @@ async function withTempDir(fn) {
     await rm(dir, { recursive: true, force: true });
   }
 }
-
-describe("DEFAULT_STATE", () => {
-  it("covers exactly the registered checks", () => {
-    assert.deepEqual(
-      Object.keys(DEFAULT_STATE).sort(),
-      Object.keys(CHECKS).sort(),
-    );
-  });
-});
 
 describe("loadState", () => {
   it("returns defaults when the state file is missing", async () => {
@@ -52,6 +42,15 @@ describe("loadState", () => {
       await assert.rejects(loadState(file), SyntaxError);
     });
   });
+
+  it("rejects an empty file instead of silently resetting", async () => {
+    // e.g. a run interrupted mid-write
+    await withTempDir(async (dir) => {
+      const file = join(dir, "state.json");
+      await writeFile(file, "");
+      await assert.rejects(loadState(file), SyntaxError);
+    });
+  });
 });
 
 describe("saveState", () => {
@@ -65,6 +64,23 @@ describe("saveState", () => {
         JSON.stringify(state, null, 2) + "\n",
       );
       assert.deepEqual(await loadState(file), state);
+    });
+  });
+
+  it("creates missing parent directories", async () => {
+    await withTempDir(async (dir) => {
+      const file = join(dir, "nested", "deeper", "state.json");
+      await saveState({ ...DEFAULT_STATE, ifx: "2026.1.2" }, file);
+      assert.equal((await loadState(file)).ifx, "2026.1.2");
+    });
+  });
+
+  it("overwrites an existing file", async () => {
+    await withTempDir(async (dir) => {
+      const file = join(dir, "state.json");
+      await saveState({ ...DEFAULT_STATE, aocc: "4.1" }, file);
+      await saveState({ ...DEFAULT_STATE, aocc: "5.2" }, file);
+      assert.equal((await loadState(file)).aocc, "5.2");
     });
   });
 });

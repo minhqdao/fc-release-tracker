@@ -21,9 +21,16 @@ describe("parseAOCC", () => {
     assert.equal(parseAOCC(body), "5.2");
   });
 
-  it("accepts underscore and space separators", () => {
+  it("is case-insensitive and accepts dash, underscore, and space separators", () => {
+    assert.equal(parseAOCC("AOCC-Compiler-5.2.0.tar"), "5.2");
     assert.equal(parseAOCC("aocc_compiler-4.1.0.tar"), "4.1");
+    assert.equal(parseAOCC("aocc_compiler_4.1.0.tar"), "4.1");
     assert.equal(parseAOCC("AOCC Compiler 3.2.0"), "3.2");
+  });
+
+  it("compares candidate versions numerically within segments", () => {
+    const body = "aocc-compiler-5.9.0.tar aocc-compiler-5.10.0.tar";
+    assert.equal(parseAOCC(body), "5.10");
   });
 
   it("throws on an unexpected real patch release", () => {
@@ -56,9 +63,18 @@ Description: current toolchain
     assert.equal(parseArmflang(packages), "22.1");
   });
 
+  it("does not depend on field order within a stanza", () => {
+    const text = "Version: 22.1-54~noble\nPackage: arm-toolchain-for-linux\n";
+    assert.equal(parseArmflang(text), "22.1");
+  });
+
   it("keeps full three-part versions when present", () => {
     const text = packages.replace("22.1-54~noble", "22.1.2-1~noble");
     assert.equal(parseArmflang(text), "22.1.2");
+  });
+
+  it("throws on empty input", () => {
+    assert.throws(() => parseArmflang(""), /no arm-toolchain-for-linux/);
   });
 
   it("throws when no toolchain package is present", () => {
@@ -84,7 +100,15 @@ describe("parseFlang", () => {
     );
   });
 
-  it("throws on unexpected tag shapes", () => {
+  it("throws on non-JSON bodies", () => {
+    assert.throws(() => parseFlang("<html>rate limited</html>"), SyntaxError);
+  });
+
+  it("throws when the release has no usable tag", () => {
+    assert.throws(
+      () => parseFlang(JSON.stringify({})),
+      /unexpected LLVM release tag/,
+    );
     assert.throws(
       () => parseFlang(JSON.stringify({ tag_name: "llvmorg-23" })),
       /unexpected LLVM release tag/,
@@ -118,6 +142,36 @@ Version: 16-20260315-1ubuntu1~24~ppa1
     assert.equal(parseGFortranApt(withRelease), "16.1.0");
   });
 
+  it("picks the greatest release version among stanzas of the newest major", () => {
+    const text = `Package: gfortran-16
+Version: 16.1.0-1ubuntu1~24.04
+
+Package: gfortran-16
+Version: 16.1.1-1ubuntu1~24.04
+`;
+    assert.equal(parseGFortranApt(text), "16.1.1");
+  });
+
+  it("finds the newest major regardless of stanza order", () => {
+    const text = `Package: gfortran-16
+Version: 16-20260315-1ubuntu1~24~ppa1
+
+Package: gfortran-15
+Version: 15.2.0-1ubuntu1~24.04
+`;
+    assert.equal(parseGFortranApt(text), "16");
+  });
+
+  it("ignores packages that merely start with gfortran-<digits>", () => {
+    const text = `Package: gfortran-16-multilib
+Version: 16.1.0-1
+
+Package: gfortran-15
+Version: 15.2.0-1ubuntu1~24.04
+`;
+    assert.equal(parseGFortranApt(text), "15.2.0");
+  });
+
   it("throws when no gfortran packages are present", () => {
     assert.throws(
       () => parseGFortranApt("Package: gcc-15\nVersion: 15.2.0-1\n"),
@@ -138,10 +192,26 @@ describe("parseGFortranBrew", () => {
     );
   });
 
+  it("reads versions.stable from a realistic formula document", () => {
+    const body = JSON.stringify({
+      name: "gcc",
+      desc: "The GNU compiler collection",
+      versions: { stable: "16.2.0", head: "HEAD-1234abcd", bottle: true },
+      urls: {
+        stable: { url: "https://ftp.gnu.org/gnu/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz" },
+      },
+    });
+    assert.equal(parseGFortranBrew(body), "16.2.0");
+  });
+
   it("throws on unexpected stable values", () => {
     assert.throws(
       () =>
         parseGFortranBrew(JSON.stringify({ versions: { stable: "HEAD-abc1234" } })),
+      /unexpected brew gcc stable version/,
+    );
+    assert.throws(
+      () => parseGFortranBrew(JSON.stringify({ versions: { stable: 16 } })),
       /unexpected brew gcc stable version/,
     );
     assert.throws(
@@ -158,6 +228,14 @@ describe("parseGFortranWinlibs", () => {
       tag_name: "16.2.0posix-14.0.0-ucrt-r1",
     });
     assert.equal(parseGFortranWinlibs(body), "16.2.0");
+  });
+
+  it("accepts two-part versions in the title", () => {
+    const body = JSON.stringify({
+      name: "GCC 16.2 (POSIX threads) release",
+      tag_name: "16.2posix-14.0.0-ucrt-r1",
+    });
+    assert.equal(parseGFortranWinlibs(body), "16.2");
   });
 
   it("falls back to the tag prefix when the title has no GCC version", () => {
@@ -177,16 +255,29 @@ describe("parseGFortranWinlibs", () => {
 });
 
 describe("parseIfx", () => {
-  it("reads info.version", () => {
+  it("reads info.version in the year.minor.patch scheme", () => {
     assert.equal(
       parseIfx(JSON.stringify({ info: { version: "2026.1.1" } })),
       "2026.1.1",
     );
+    assert.equal(
+      parseIfx(JSON.stringify({ info: { version: "2026.0.0" } })),
+      "2026.0.0",
+    );
   });
 
-  it("throws on unexpected version formats", () => {
+  it("throws on missing info or unexpected version formats", () => {
+    assert.throws(
+      () => parseIfx(JSON.stringify({})),
+      /unexpected intel-fortran-rt version/,
+    );
     assert.throws(
       () => parseIfx(JSON.stringify({ info: { version: "next" } })),
+      /unexpected intel-fortran-rt version/,
+    );
+    // not a 4-digit year
+    assert.throws(
+      () => parseIfx(JSON.stringify({ info: { version: "26.1.1" } })),
       /unexpected intel-fortran-rt version/,
     );
   });
@@ -200,7 +291,20 @@ describe("parseLFortran", () => {
     assert.equal(parseLFortran(body), "0.65.0");
   });
 
-  it("throws when no dotted versions exist", () => {
+  it("reads from a realistic package document", () => {
+    const body = JSON.stringify({
+      latest_version: "0.65.0",
+      versions: ["0.64.1", "0.65.0"],
+      files: {},
+    });
+    assert.equal(parseLFortran(body), "0.65.0");
+  });
+
+  it("throws when the versions key is missing or empty", () => {
+    assert.throws(
+      () => parseLFortran(JSON.stringify({ latest_version: "0.65.0" })),
+      /no lfortran versions/,
+    );
     assert.throws(
       () => parseLFortran(JSON.stringify({ versions: ["1.0.0rc1"] })),
       /no lfortran versions/,
@@ -213,6 +317,15 @@ describe("parseNvfortran", () => {
     const body =
       "<title>Archive — HPC SDK Release Notes 26.5 documentation</title>";
     assert.equal(parseNvfortran(body), "26.5");
+  });
+
+  it("handles three-part versions and extra whitespace", () => {
+    assert.equal(
+      parseNvfortran(
+        "<title>HPC SDK Release Notes   25.7.1   documentation</title>",
+      ),
+      "25.7.1",
+    );
   });
 
   it("matches the title case-insensitively", () => {
