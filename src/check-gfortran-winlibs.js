@@ -15,6 +15,10 @@ import { runStandalone } from "./lib/standalone.js";
 export const GFORTRAN_WINLIBS_URL =
   "https://api.github.com/repos/brechtsanders/winlibs_mingw/releases/latest";
 
+// Human-facing source link (the API URL above is what we actually read).
+export const GFORTRAN_WINLIBS_RELEASES_URL =
+  "https://github.com/brechtsanders/winlibs_mingw/releases/latest";
+
 /**
  * Extract the GCC version from the release JSON body (title, fallback: tag).
  * @param {string} body
@@ -36,7 +40,11 @@ export function parseGFortranWinlibs(body) {
  */
 export async function checkGFortranWinlibs() {
   const latestVersion = parseGFortranWinlibs(await fetchText(GFORTRAN_WINLIBS_URL));
-  return { compiler: "gfortran-winlibs", latestVersion, url: GFORTRAN_WINLIBS_URL };
+  return {
+    compiler: "gfortran-winlibs",
+    latestVersion,
+    url: GFORTRAN_WINLIBS_RELEASES_URL,
+  };
 }
 
 // Allow running standalone: node src/check-gfortran-winlibs.js

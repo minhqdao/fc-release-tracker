@@ -17,6 +17,9 @@ import { runStandalone } from "./lib/standalone.js";
 
 export const IFX_PYPI_URL = "https://pypi.org/pypi/intel-fortran-rt/json";
 
+// Human-facing source link (the JSON API above is what we actually read).
+export const IFX_PROJECT_URL = "https://pypi.org/project/intel-fortran-rt/";
+
 /**
  * Extract the compiler version from the PyPI JSON body.
  * @param {string} body
@@ -36,7 +39,7 @@ export function parseIfx(body) {
  */
 export async function checkIfx() {
   const latestVersion = parseIfx(await fetchText(IFX_PYPI_URL));
-  return { compiler: "ifx", latestVersion, url: IFX_PYPI_URL };
+  return { compiler: "ifx", latestVersion, url: IFX_PROJECT_URL };
 }
 
 // Allow running standalone: node src/check-ifx.js

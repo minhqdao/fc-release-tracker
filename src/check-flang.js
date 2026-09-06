@@ -20,6 +20,10 @@ import { runStandalone } from "./lib/standalone.js";
 export const FLANG_GITHUB_URL =
   "https://api.github.com/repos/llvm/llvm-project/releases/latest";
 
+// Human-facing source link (the API URL above is what we actually read).
+export const FLANG_RELEASES_URL =
+  "https://github.com/llvm/llvm-project/releases/latest";
+
 /**
  * Extract the latest LLVM version from the /releases/latest JSON body.
  * @param {string} body
@@ -43,7 +47,7 @@ export function parseFlang(body) {
  */
 export async function checkFlang() {
   const latestVersion = parseFlang(await fetchText(FLANG_GITHUB_URL));
-  return { compiler: "flang", latestVersion, url: FLANG_GITHUB_URL };
+  return { compiler: "flang", latestVersion, url: FLANG_RELEASES_URL };
 }
 
 // Allow running standalone: node src/check-flang.js

@@ -13,6 +13,9 @@ import { runStandalone } from "./lib/standalone.js";
 
 export const GFORTRAN_BREW_URL = "https://formulae.brew.sh/api/formula/gcc.json";
 
+// Human-facing source link (the JSON API above is what we actually read).
+export const GFORTRAN_BREW_PAGE_URL = "https://formulae.brew.sh/formula/gcc";
+
 /**
  * Extract the stable gcc version from the formula JSON body.
  * @param {string} body
@@ -34,7 +37,7 @@ export function parseGFortranBrew(body) {
  */
 export async function checkGFortranBrew() {
   const latestVersion = parseGFortranBrew(await fetchText(GFORTRAN_BREW_URL));
-  return { compiler: "gfortran-brew", latestVersion, url: GFORTRAN_BREW_URL };
+  return { compiler: "gfortran-brew", latestVersion, url: GFORTRAN_BREW_PAGE_URL };
 }
 
 // Allow running standalone: node src/check-gfortran-brew.js

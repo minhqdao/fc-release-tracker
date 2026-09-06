@@ -61,6 +61,10 @@ describe("renderReleaseBody", () => {
     assert.match(body, /previous: `2026\.1\.1`/);
     assert.match(body, /\*\*`2026\.1\.2`\*\*/);
     assert.match(body, /https:\/\/pypi\.org\/pypi\/intel-fortran-rt\/json/);
+    // clarifies the auto-generated "Source code" archive, which GitHub
+    // provides on every release and which cannot be disabled
+    assert.match(body, /\*\*Note:\*\* No compiler binaries/);
+    assert.match(body, /"Source code" archive is just this tracker/);
   });
 
   it("says when no previous version was recorded", () => {

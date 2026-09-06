@@ -14,6 +14,9 @@ import { runStandalone } from "./lib/standalone.js";
 export const LFORTRAN_CONDA_URL =
   "https://api.anaconda.org/package/conda-forge/lfortran";
 
+// Human-facing source link (the API URL above is what we actually read).
+export const LFORTRAN_PAGE_URL = "https://anaconda.org/conda-forge/lfortran";
+
 /**
  * Extract the latest dotted version from the Anaconda.org JSON body.
  * @param {string} body
@@ -35,7 +38,7 @@ export function parseLFortran(body) {
  */
 export async function checkLFortran() {
   const latestVersion = parseLFortran(await fetchText(LFORTRAN_CONDA_URL));
-  return { compiler: "lfortran", latestVersion, url: LFORTRAN_CONDA_URL };
+  return { compiler: "lfortran", latestVersion, url: LFORTRAN_PAGE_URL };
 }
 
 // Allow running standalone: node src/check-lfortran.js

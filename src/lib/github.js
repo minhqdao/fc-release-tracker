@@ -74,6 +74,8 @@ export function renderReleaseBody(event) {
     `- previous: \`${event.previousVersion ?? "not recorded"}\``,
     `- new: **\`${event.latestVersion}\`**`,
     `- source: ${event.url}`,
+    "",
+    '**Note:** No compiler binaries are attached — the auto-generated "Source code" archive is just this tracker\'s own code.',
   ].join("\n") + runLink();
 }
 

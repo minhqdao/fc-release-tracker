@@ -23,6 +23,10 @@ import { runStandalone } from "./lib/standalone.js";
 export const GFORTRAN_APT_INDEX_URL =
   "https://ppa.launchpadcontent.net/ubuntu-toolchain-r/test/ubuntu/dists/noble/main/binary-amd64/Packages.gz";
 
+// Human-facing source link (the Packages.gz index above is what we read).
+export const GFORTRAN_PPA_URL =
+  "https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test";
+
 /**
  * Extract the latest gfortran version from a decompressed Packages index.
  * @param {string} text
@@ -60,7 +64,7 @@ export async function checkGFortranApt() {
   const raw = await fetchBytes(GFORTRAN_APT_INDEX_URL);
   const text = gunzipSync(new Uint8Array(raw)).toString("utf8");
   const latestVersion = parseGFortranApt(text);
-  return { compiler: "gfortran-apt", latestVersion, url: GFORTRAN_APT_INDEX_URL };
+  return { compiler: "gfortran-apt", latestVersion, url: GFORTRAN_PPA_URL };
 }
 
 // Allow running standalone: node src/check-gfortran-apt.js

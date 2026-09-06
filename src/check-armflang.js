@@ -15,6 +15,11 @@ import { runStandalone } from "./lib/standalone.js";
 export const ARMFLANG_PACKAGES_URL =
   "https://developer.arm.com/packages/arm-toolchains/ubuntu/dists/noble/main/binary-arm64/Packages";
 
+// Human-facing source link (the Packages index above is what we read).
+// Verified to render; the /downloads/-/ permalink renders an empty SPA route.
+export const ARMFLANG_PAGE_URL =
+  "https://developer.arm.com/tools-and-software/arm-fortran-compiler";
+
 /**
  * Extract the latest arm-toolchain-for-linux version from a Packages index.
  * @param {string} text
@@ -39,7 +44,7 @@ export function parseArmflang(text) {
  */
 export async function checkArmflang() {
   const latestVersion = parseArmflang(await fetchText(ARMFLANG_PACKAGES_URL));
-  return { compiler: "armflang", latestVersion, url: ARMFLANG_PACKAGES_URL };
+  return { compiler: "armflang", latestVersion, url: ARMFLANG_PAGE_URL };
 }
 
 // Allow running standalone: node src/check-armflang.js
