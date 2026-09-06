@@ -5,7 +5,7 @@
   "gfortran-apt": "16",
   "gfortran-brew": "16.2.0",
   "gfortran-winlibs": "16.2.0",
-  "ifx": "2026.1.1",
+  "ifx": "2026.1.2",
   "lfortran": "0.65.0",
   "nvfortran": "26.5"
 }
