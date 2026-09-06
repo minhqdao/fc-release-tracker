@@ -82,9 +82,15 @@ describe("renderReleaseBody", () => {
     process.env.GITHUB_SERVER_URL = "https://github.com";
     process.env.GITHUB_REPOSITORY = "minhqdao/fc-release-tracker";
     process.env.GITHUB_RUN_ID = "12345";
+    const body = renderReleaseBody(event);
     assert.match(
-      renderReleaseBody(event),
+      body,
       /Workflow run: https:\/\/github\.com\/minhqdao\/fc-release-tracker\/actions\/runs\/12345/,
+    );
+    // the note sits below the workflow-run line
+    assert.ok(
+      body.indexOf("Workflow run:") < body.indexOf("**Note:**"),
+      "note should come after the workflow-run line",
     );
   });
 });

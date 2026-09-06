@@ -68,15 +68,17 @@ export function renderFailureBody(event) {
 
 /** Render the release notes body for a new compiler release. */
 export function renderReleaseBody(event) {
-  return [
+  const body = [
     `A new release was detected for \`${event.compiler}\`.`,
     "",
     `- previous: \`${event.previousVersion ?? "not recorded"}\``,
     `- new: **\`${event.latestVersion}\`**`,
     `- source: ${event.url}`,
-    "",
-    '**Note:** No compiler binaries are attached — the auto-generated "Source code" archive is just this tracker\'s own code.',
-  ].join("\n") + runLink();
+  ].join("\n");
+  return (
+    `${body}${runLink()}\n\n` +
+    '**Note:** No compiler binaries are attached — the auto-generated "Source code" archive is just this tracker\'s own code.'
+  );
 }
 
 /** Error carrying the HTTP status so callers can branch on 404/422. */
