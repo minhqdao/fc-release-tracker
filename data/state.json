@@ -1,7 +1,7 @@
 {
   "aocc": "5.2",
   "armflang": "22.1",
-  "flang": "23.1.0",
+  "flang": "23.1.1",
   "gfortran-apt": "16",
   "gfortran-brew": "16.2.0",
   "gfortran-winlibs": "16.2.0",
