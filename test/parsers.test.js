@@ -255,37 +255,42 @@ describe("parseGFortranWinlibs", () => {
 });
 
 describe("parseIfx", () => {
-  it("reads info.version in the year.minor.patch scheme", () => {
-    assert.equal(
-      parseIfx(JSON.stringify({ info: { version: "2026.1.1" } })),
-      "2026.1.1",
-    );
-    assert.equal(
-      parseIfx(JSON.stringify({ info: { version: "2026.0.0" } })),
-      "2026.0.0",
-    );
-    // tolerated shape; lib/version.js compares it as 2026.1
-    assert.equal(parseIfx(JSON.stringify({ info: { version: "2026.1" } })), "2026.1");
+  const stanza = (pkg, version) =>
+    `Package: ${pkg}\nArchitecture: amd64\nVersion: ${version}\n`;
+
+  it("reads the full version from intel-oneapi-compiler-fortran stanzas, stripping the Debian revision", () => {
+    const text = [
+      stanza("intel-oneapi-compiler-fortran", "2026.1.0-235"),
+      stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
+      stanza("intel-oneapi-compiler-fortran", "2026.0.0-947"),
+    ].join("\n");
+    assert.equal(parseIfx(text), "2026.1.1");
   });
 
-  it("throws on missing info or unexpected version formats", () => {
+  it("ignores version-suffixed metapackages, which exist only at major.minor granularity", () => {
+    const text = [
+      stanza("intel-oneapi-compiler-fortran-2026.1", "2026.1-325"),
+      stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
+    ].join("\n");
+    assert.equal(parseIfx(text), "2026.1.1");
+  });
+
+  it("ignores the runtime package", () => {
+    const text = [
+      stanza("intel-oneapi-compiler-fortran-runtime", "2026.1.2-100"),
+      stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
+    ].join("\n");
+    assert.equal(parseIfx(text), "2026.1.1");
+  });
+
+  it("throws when no compiler package is present", () => {
     assert.throws(
-      () => parseIfx(JSON.stringify({})),
-      /unexpected intel-fortran-rt version/,
+      () => parseIfx(stanza("intel-oneapi-compiler-fortran-runtime", "2026.1.1-1")),
+      /no intel-oneapi-compiler-fortran packages/,
     );
     assert.throws(
-      () => parseIfx(JSON.stringify({ info: { version: "next" } })),
-      /unexpected intel-fortran-rt version/,
-    );
-    // not a 4-digit year
-    assert.throws(
-      () => parseIfx(JSON.stringify({ info: { version: "26.1.1" } })),
-      /unexpected intel-fortran-rt version/,
-    );
-    // trailing garbage must never reach release tag names
-    assert.throws(
-      () => parseIfx(JSON.stringify({ info: { version: "2026.1.2rc1" } })),
-      /unexpected intel-fortran-rt version/,
+      () => parseIfx("Package: gcc-15\nVersion: 15.2.0-1\n"),
+      /no intel-oneapi-compiler-fortran packages/,
     );
   });
 });
