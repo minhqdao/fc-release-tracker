@@ -1,29 +1,29 @@
 # fc-release-tracker
 
-Tracks new Fortran compiler (FC) versions as they become available. All [sources](#sources) are monitored via a scheduled job in GitHub Actions, and a GitHub Release is published for each newly detected compiler version.
+Get notified when new Fortran compiler versions are released.
 
-**Activate Watch → Custom → Releases to get notified of new compiler versions.**
+The project monitors all [sources](#sources) via a scheduled GitHub Actions job and publishes a GitHub Release for each newly detected compiler version.
+
+Activate **Watch → Custom → Releases** to get notified.
 
 ## Usage
 
 Requires Node.js 20 or later.
 
-Fetch the latest compiler versions from all sources:
+Use `latest` to see the latest compiler versions available from all tracked sources:
 
 ```sh
 npm run latest
 ```
 
-Fetch the latest version of a specific compiler:
+To fetch the latest version of a specific compiler:
 
 ```sh
 npm run latest -- lfortran
 ```
 
-Check for new releases and update local state:
-```sh
-npm run check
-```
+The `check` command is run automatically by GitHub Actions to detect new releases and update the local state.
+
 
 ## Development
 
