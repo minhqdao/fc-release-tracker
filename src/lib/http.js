@@ -8,6 +8,22 @@ import { compareVersions } from "./version.js";
 
 const USER_AGENT = "Mozilla/5.0";
 
+// GitHub's API allows only 60 anonymous requests per hour per IP, which shared
+// runner IPs exhaust immediately. Authenticate GitHub hosts only, so the
+// workflow token is never sent to third-party sources.
+const GITHUB_HOSTS = new Set(["github.com", "api.github.com"]);
+
+/**
+ * Authorization header for GitHub hosts when GITHUB_TOKEN is set, else {}.
+ * @param {string} url
+ * @returns {Record<string, string>}
+ */
+export function authHeaders(url) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token || !GITHUB_HOSTS.has(new URL(url).hostname)) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 export const FETCH_TIMEOUT_MS = 30_000;
 
 /**
@@ -18,7 +34,7 @@ export const FETCH_TIMEOUT_MS = 30_000;
  */
 async function fetchOk(url) {
   const res = await fetch(url, {
-    headers: { "user-agent": USER_AGENT },
+    headers: { "user-agent": USER_AGENT, ...authHeaders(url) },
     redirect: "follow",
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });

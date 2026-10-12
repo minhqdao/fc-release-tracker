@@ -1,9 +1,9 @@
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { gunzipSync, gzipSync } from "node:zlib";
 
-import { fetchBytes, fetchText, maxVersion } from "../src/lib/http.js";
+import { authHeaders, fetchBytes, fetchText, maxVersion } from "../src/lib/http.js";
 
 describe("maxVersion", () => {
   it("picks the greatest version", () => {
@@ -48,6 +48,33 @@ describe("maxVersion", () => {
 
   it("throws when there are no candidates", () => {
     assert.throws(() => maxVersion([]), /no version candidates found/);
+  });
+});
+
+describe("authHeaders", () => {
+  const saved = process.env.GITHUB_TOKEN;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = saved;
+  });
+
+  it("authenticates GitHub API hosts when a token is set", () => {
+    process.env.GITHUB_TOKEN = "t";
+    assert.deepEqual(
+      authHeaders("https://api.github.com/repos/o/r/releases/latest"),
+      { Authorization: "Bearer t" },
+    );
+  });
+
+  it("sends nothing without a token", () => {
+    delete process.env.GITHUB_TOKEN;
+    assert.deepEqual(authHeaders("https://api.github.com/repos/o/r"), {});
+  });
+
+  it("never leaks the token to third-party hosts", () => {
+    process.env.GITHUB_TOKEN = "t";
+    assert.deepEqual(authHeaders("https://apt.llvm.org/llvm.sh"), {});
+    assert.deepEqual(authHeaders("https://formulae.brew.sh/api/formula.json"), {});
   });
 });
 
