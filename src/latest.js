@@ -1,6 +1,6 @@
 /**
  * CLI: print the latest version of a compiler (or all compilers) and
- * nothing else, e.g. `latest ifx` -> "2026.1.1". Reuses the same checks as
+ * nothing else, e.g. `latest ifx-linux` -> "2026.2.0". Reuses the same checks as
  * the scheduled runner, without touching state or GitHub.
  */
 

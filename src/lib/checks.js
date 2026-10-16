@@ -9,7 +9,8 @@ import { checkFlang } from "../check-flang.js";
 import { checkGFortranApt } from "../check-gfortran-apt.js";
 import { checkGFortranBrew } from "../check-gfortran-brew.js";
 import { checkGFortranWinlibs } from "../check-gfortran-winlibs.js";
-import { checkIfx } from "../check-ifx.js";
+import { checkIfxLinux } from "../check-ifx-linux.js";
+import { checkIfxWin } from "../check-ifx-win.js";
 import { checkLFortran } from "../check-lfortran.js";
 import { checkNvfortran } from "../check-nvfortran.js";
 
@@ -21,7 +22,8 @@ export const CHECKS = Object.freeze({
   "gfortran-apt": checkGFortranApt,
   "gfortran-brew": checkGFortranBrew,
   "gfortran-winlibs": checkGFortranWinlibs,
-  ifx: checkIfx,
+  "ifx-linux": checkIfxLinux,
+  "ifx-win": checkIfxWin,
   lfortran: checkLFortran,
   nvfortran: checkNvfortran,
 });

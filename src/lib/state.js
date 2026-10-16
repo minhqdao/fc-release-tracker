@@ -31,7 +31,18 @@ export const DEFAULT_STATE = Object.freeze(
 export async function loadState(statePath = STATE_PATH) {
   try {
     const raw = await readFile(statePath, "utf8");
-    return { ...DEFAULT_STATE, ...JSON.parse(raw) };
+    const state = { ...DEFAULT_STATE, ...JSON.parse(raw) };
+    // Backwards-compat migration: the old single "ifx" channel was split
+    // into "ifx-linux" (and "ifx-win"). Preserve an old last-seen version
+    // under its new key instead of leaving an orphaned entry behind.
+    if (
+      Object.prototype.hasOwnProperty.call(state, "ifx") &&
+      state["ifx-linux"] == null
+    ) {
+      state["ifx-linux"] = state.ifx;
+    }
+    delete state.ifx;
+    return state;
   } catch (err) {
     if (err.code === "ENOENT") return { ...DEFAULT_STATE };
     throw err;

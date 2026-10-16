@@ -35,7 +35,7 @@ export const IFX_PAGE_URL =
  * @param {string} text
  * @returns {string} latest version, e.g. "2026.1.1"
  */
-export function parseIfx(text) {
+export function parseIfxLinux(text) {
   const candidates = text
     .split(/\n\s*\n/)
     .filter((stanza) =>
@@ -55,14 +55,14 @@ export function parseIfx(text) {
 }
 
 /**
- * @returns {Promise<{ compiler: "ifx", latestVersion: string, url: string }>}
+ * @returns {Promise<{ compiler: "ifx-linux", latestVersion: string, url: string }>}
  */
-export async function checkIfx() {
+export async function checkIfxLinux() {
   const raw = await fetchBytes(IFX_APT_INDEX_URL);
   const text = gunzipSync(new Uint8Array(raw)).toString("utf8");
-  const latestVersion = parseIfx(text);
-  return { compiler: "ifx", latestVersion, url: IFX_PAGE_URL };
+  const latestVersion = parseIfxLinux(text);
+  return { compiler: "ifx-linux", latestVersion, url: IFX_PAGE_URL };
 }
 
-// Allow running standalone: node src/check-ifx.js
-runStandalone(import.meta.url, checkIfx);
+// Allow running standalone: node src/check-ifx-linux.js
+runStandalone(import.meta.url, checkIfxLinux);

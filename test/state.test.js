@@ -44,7 +44,7 @@ describe("loadState", () => {
       const state = await loadState(file);
       assert.equal(state.aocc, "5.2");
       assert.equal(state.retired, "1.0");
-      assert.equal(state.ifx, null);
+      assert.equal(state["ifx-linux"], null);
     });
   });
 
@@ -83,8 +83,8 @@ describe("saveState", () => {
   it("creates missing parent directories", async () => {
     await withTempDir(async (dir) => {
       const file = join(dir, "nested", "deeper", "state.json");
-      await saveState({ ...DEFAULT_STATE, ifx: "2026.1.2" }, file);
-      assert.equal((await loadState(file)).ifx, "2026.1.2");
+      await saveState({ ...DEFAULT_STATE, "ifx-linux": "2026.1.2" }, file);
+      assert.equal((await loadState(file))["ifx-linux"], "2026.1.2");
     });
   });
 

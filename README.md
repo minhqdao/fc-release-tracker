@@ -43,6 +43,7 @@ npm test
 | gfortran (apt) | https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test |
 | gfortran (brew) | https://formulae.brew.sh/formula/gcc |
 | gfortran (winlibs) | https://github.com/brechtsanders/winlibs_mingw/releases/latest |
-| ifx | https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler-download.html |
+| ifx (Linux, apt) | https://apt.repos.intel.com/oneapi/dists/all/main/binary-amd64/Packages.gz |
+| ifx (Windows, conda-forge) | https://anaconda.org/conda-forge/ifx_win-64 |
 | lfortran | https://anaconda.org/conda-forge/lfortran |
 | nvfortran | https://docs.nvidia.com/hpc-sdk/release-notes/index.html |

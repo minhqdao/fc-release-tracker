@@ -7,7 +7,8 @@ import { parseFlang } from "../src/check-flang.js";
 import { parseGFortranApt } from "../src/check-gfortran-apt.js";
 import { parseGFortranBrew } from "../src/check-gfortran-brew.js";
 import { parseGFortranWinlibs } from "../src/check-gfortran-winlibs.js";
-import { parseIfx } from "../src/check-ifx.js";
+import { parseIfxLinux } from "../src/check-ifx-linux.js";
+import { parseIfxWin } from "../src/check-ifx-win.js";
 import { parseLFortran } from "../src/check-lfortran.js";
 import { parseNvfortran } from "../src/check-nvfortran.js";
 
@@ -264,7 +265,7 @@ describe("parseIfx", () => {
       stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
       stanza("intel-oneapi-compiler-fortran", "2026.0.0-947"),
     ].join("\n");
-    assert.equal(parseIfx(text), "2026.1.1");
+    assert.equal(parseIfxLinux(text), "2026.1.1");
   });
 
   it("ignores version-suffixed metapackages, which exist only at major.minor granularity", () => {
@@ -272,7 +273,7 @@ describe("parseIfx", () => {
       stanza("intel-oneapi-compiler-fortran-2026.1", "2026.1-325"),
       stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
     ].join("\n");
-    assert.equal(parseIfx(text), "2026.1.1");
+    assert.equal(parseIfxLinux(text), "2026.1.1");
   });
 
   it("ignores the runtime package", () => {
@@ -280,17 +281,44 @@ describe("parseIfx", () => {
       stanza("intel-oneapi-compiler-fortran-runtime", "2026.1.2-100"),
       stanza("intel-oneapi-compiler-fortran", "2026.1.1-325"),
     ].join("\n");
-    assert.equal(parseIfx(text), "2026.1.1");
+    assert.equal(parseIfxLinux(text), "2026.1.1");
   });
 
   it("throws when no compiler package is present", () => {
     assert.throws(
-      () => parseIfx(stanza("intel-oneapi-compiler-fortran-runtime", "2026.1.1-1")),
+      () => parseIfxLinux(stanza("intel-oneapi-compiler-fortran-runtime", "2026.1.1-1")),
       /no intel-oneapi-compiler-fortran packages/,
     );
     assert.throws(
-      () => parseIfx("Package: gcc-15\nVersion: 15.2.0-1\n"),
+      () => parseIfxLinux("Package: gcc-15\nVersion: 15.2.0-1\n"),
       /no intel-oneapi-compiler-fortran packages/,
+    );
+  });
+});
+
+describe("parseIfxWin", () => {
+  it("picks the greatest version", () => {
+    const body = JSON.stringify({
+      versions: ["2025.3.2", "2026.0.0", "2026.1.1", "2026.1.0"],
+    });
+    assert.equal(parseIfxWin(body), "2026.1.1");
+  });
+
+  it("ignores non-release candidates", () => {
+    const body = JSON.stringify({
+      versions: ["2026.2.0rc1", "2026.1.1"],
+    });
+    assert.equal(parseIfxWin(body), "2026.1.1");
+  });
+
+  it("throws when no usable versions are present", () => {
+    assert.throws(
+      () => parseIfxWin(JSON.stringify({})),
+      /no ifx_win-64 versions/,
+    );
+    assert.throws(
+      () => parseIfxWin(JSON.stringify({ versions: ["2026.2.0rc1"] })),
+      /no ifx_win-64 versions/,
     );
   });
 });
