@@ -242,7 +242,7 @@ export function failureSignature(event) {
 /** Render the body of a new failure-tracking issue. */
 export function failureIssueBody(event) {
   return (
-    FAILURE_INTRO.replaceAll("{compiler}", `\`${event.compiler}\``) +
+    FAILURE_INTRO.replaceAll("{compiler}", event.compiler) +
     `${FIRST_FAILURE_SEPARATOR}${renderFailureBody(event)}`
   );
 }
