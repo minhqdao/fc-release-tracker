@@ -144,6 +144,66 @@ describe("fetchText", () => {
   });
 });
 
+describe("retry policy", () => {
+  it("retries a 503 once and returns the recovered body", async () => {
+    let requests = 0;
+    await withServer(
+      (req, res) => {
+        requests++;
+        if (requests === 1) res.writeHead(503).end("no server available");
+        else res.end("16.2.0");
+      },
+      async (url) => {
+        assert.equal(await fetchText(url), "16.2.0");
+      },
+    );
+    assert.equal(requests, 2);
+  });
+
+  it("gives up after one retry and reports the transient status", async () => {
+    let requests = 0;
+    await withServer(
+      (req, res) => {
+        requests++;
+        res.writeHead(503).end();
+      },
+      async (url) => {
+        await assert.rejects(fetchText(url), /fetch failed: 503/);
+      },
+    );
+    assert.equal(requests, 2);
+  });
+
+  it("does not retry client errors", async () => {
+    let requests = 0;
+    await withServer(
+      (req, res) => {
+        requests++;
+        res.writeHead(404).end();
+      },
+      async (url) => {
+        await assert.rejects(fetchText(url), /fetch failed: 404/);
+      },
+    );
+    assert.equal(requests, 1);
+  });
+
+  it("retries a connection reset", async () => {
+    let requests = 0;
+    await withServer(
+      (req, res) => {
+        requests++;
+        if (requests === 1) req.socket.destroy();
+        else res.end("16.2.0");
+      },
+      async (url) => {
+        assert.equal(await fetchText(url), "16.2.0");
+      },
+    );
+    assert.equal(requests, 2);
+  });
+});
+
 describe("fetchBytes", () => {
   it("returns raw bytes the caller can decompress (apt checker pattern)", async () => {
     const payload = gzipSync(

@@ -26,22 +26,72 @@ export function authHeaders(url) {
 
 export const FETCH_TIMEOUT_MS = 30_000;
 
+/** Pause before the one retry of a transient failure. */
+export const RETRY_DELAY_MS = 1_000;
+
+/**
+ * Statuses worth a second attempt. Deliberately no 429: a rate limit does not
+ * clear in a second, and waiting out `Retry-After` can mean minutes — that is
+ * a failure to report, not to paper over.
+ */
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
+
+/**
+ * Socket-level failures worth a second attempt. A stalled connection is
+ * treated as transient too (30s spent, but the run has budget for a second
+ * attempt); a wrong hostname is not.
+ */
+const TRANSIENT_CODES = new Set([
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EPIPE",
+  "ETIMEDOUT",
+  "EAI_AGAIN",
+  "UND_ERR_SOCKET",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+]);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isTransientNetworkError(err) {
+  // AbortSignal.timeout rejects with a TimeoutError DOMException; undici
+  // reports socket failures as a TypeError carrying `cause.code`.
+  return err?.name === "TimeoutError" || TRANSIENT_CODES.has(err?.cause?.code);
+}
+
 /**
  * Fetch a URL with the shared UA/timeout policy and return the Response
- * once status is known to be ok.
+ * once status is known to be ok. Transient failures (5xx, reset/stalled
+ * connections) get exactly one retry after RETRY_DELAY_MS; anything else —
+ * 4xx, a second consecutive transient failure — throws immediately.
  * @param {string} url
  * @returns {Promise<Response>}
  */
 async function fetchOk(url) {
-  const res = await fetch(url, {
-    headers: { "user-agent": USER_AGENT, ...authHeaders(url) },
-    redirect: "follow",
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new Error(`fetch failed: ${res.status} ${res.statusText} (${url})`);
+  for (let attempt = 0; ; attempt++) {
+    let retryable = false;
+    let err;
+    try {
+      const res = await fetch(url, {
+        headers: { "user-agent": USER_AGENT, ...authHeaders(url) },
+        redirect: "follow",
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (res.ok) return res;
+      // Nobody reads an error body; cancel it so the socket is not parked
+      // until the process exits.
+      await res.body?.cancel().catch(() => {});
+      retryable = TRANSIENT_STATUSES.has(res.status);
+      err = new Error(`fetch failed: ${res.status} ${res.statusText} (${url})`);
+    } catch (cause) {
+      retryable = isTransientNetworkError(cause);
+      err = cause;
+    }
+    if (!retryable || attempt > 0) throw err;
+    await sleep(RETRY_DELAY_MS);
   }
-  return res;
 }
 
 /**
