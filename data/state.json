@@ -1,5 +1,5 @@
 {
-  "aocc": "5.2",
+  "aocc": "6.0",
   "armflang": "23.1",
   "flang": "23.1.5",
   "gfortran-apt": "16",
@@ -7,6 +7,6 @@
   "gfortran-winlibs": "16.2.0",
   "ifx-linux": "2026.2.0",
   "ifx-win": "2026.2.0",
-  "lfortran": "0.68.0",
+  "lfortran": "0.69.0",
   "nvfortran": "26.9"
 }
